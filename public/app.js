@@ -415,7 +415,7 @@ function renderUpcoming() {
 // ---- Calendar Grid ----
 function renderCalendar() {
   const endDate = new Date(viewDate);
-  endDate.setDate(viewDate.getDate() + 6);
+  endDate.setDate(viewDate.getDate() + 13);
   
   const m1 = AY[viewDate.getMonth()];
   const m2 = AY[endDate.getMonth()];
@@ -435,7 +435,7 @@ function renderCalendar() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 14; i++) {
     const dateObj = new Date(viewDate);
     dateObj.setDate(viewDate.getDate() + i);
     
@@ -469,7 +469,7 @@ function renderCalendar() {
     const el = document.createElement('div');
     el.className = cls;
 
-    // 7 günlük hava durumu simgesi (takvim hücresi)
+    // Hava durumu simgesi (takvim hücresi)
     const w = weatherCache[dateStr];
     const weatherBadge = w ? `<span class="cal-weather" title="${w.text}: ${w.maxTemp}° / ${w.minTemp}°C">${w.icon}${w.maxTemp}°</span>` : '';
 
@@ -487,7 +487,7 @@ function renderCalendar() {
 }
 
 function navWeek(dir) {
-  viewDate.setDate(viewDate.getDate() + (dir * 7));
+  viewDate.setDate(viewDate.getDate() + (dir * 14));
   renderCalendar();
 }
 
