@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Salalı</title>
+  <meta name="description" content="Salalı dağ evi dolu/boş durum takibi">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // Inline script to prevent flash of name overlay if already logged in
+    (function() {
+      try {
+        var user = localStorage.getItem('salali_user');
+        if (user) {
+          document.documentElement.classList.add('has-user');
+        }
+      } catch(e) {}
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- Arka plan fotoğraf -->
+  <div class="bg-photo" aria-hidden="true"></div>
+  <div class="bg-overlay" aria-hidden="true"></div>
+
+  <!-- Toast bildirim kutusu -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- İsim giriş ekranı -->
+  <div class="name-overlay" id="nameOverlay">
+    <div class="name-card">
+      <h1 class="brand-title">Salalı</h1>
+      <p class="brand-sub">Devam etmek için adını seç veya gir</p>
+      
+      <!-- Hızlı İsim Seçim Listesi (Varsa) -->
+      <div class="quick-members" id="quickMembers" style="display:none;">
+        <span class="quick-title">Kayıtlı Kişiler:</span>
+        <div class="member-chips" id="memberChips"></div>
+      </div>
+
+      <form id="nameForm">
+        <input type="text" id="nameInput" placeholder="Veya yeni isim yaz..." autocomplete="off" maxlength="30" required>
+        <button type="submit" class="btn-primary">Devam Et</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Ana içerik -->
+  <div class="app" id="appContent" style="display:none;">
+
+    <!-- Header -->
+    <header class="header">
+      <h1 class="header-brand">Salalı</h1>
+      <div class="user-pill" id="userPill">
+        <span class="user-pill-dot"></span>
+        <span id="userName"></span>
+        <button class="user-pill-edit" id="btnChangeName" title="İsim değiştir">✏️</button>
+      </div>
+    </header>
+
+    <!-- Hero: Bugünün durumu -->
+    <section class="hero" id="heroSection">
+      <div class="hero-date" id="heroDate">Yükleniyor...</div>
+      <div class="hero-weather" id="heroWeather"></div>
+      <div class="hero-status status-free" id="heroStatus">
+        <div class="spinner" id="heroSpinner"></div>
+      </div>
+      <div class="hero-detail" id="heroDetail">Durum kontrol ediliyor...</div>
+      <div class="hero-action" id="heroAction"></div>
+    </section>
+
+    <!-- Yaklaşan rezervasyonlar -->
+    <section class="upcoming" id="upcomingSection" style="display:none;">
+      <h2 class="section-title">Yaklaşan Günler</h2>
+      <div class="upcoming-list" id="upcomingList"></div>
+    </section>
+
+    <!-- Takvim -->
+    <section class="calendar-section">
+      <div class="calendar-nav">
+        <button class="btn-icon-round" id="btnPrev">‹</button>
+        <h2 class="calendar-month" id="monthTitle"></h2>
+        <button class="btn-icon-round" id="btnNext">›</button>
+      </div>
+
+      <div class="calendar">
+        <div class="cal-header">
+          <span>Pt</span><span>Sa</span><span>Ça</span><span>Pe</span><span>Cu</span><span>Ct</span><span>Pa</span>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+
+      <!-- Lejant -->
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot legend-free"></span>Boş</span>
+        <span class="legend-item"><span class="legend-dot legend-occupied"></span>Dolu</span>
+        <span class="legend-item"><span class="legend-dot legend-mine"></span>Benim</span>
+        <span class="legend-item"><span class="legend-dot legend-guest"></span>Misafir</span>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-bg" id="modalBg">
+    <div class="modal" id="modal">
+      <button class="modal-x" id="modalClose">×</button>
+      <h3 class="modal-title" id="modalTitle"></h3>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

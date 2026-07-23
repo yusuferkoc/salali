@@ -1,0 +1,13 @@
+{
+  "name": "dag-evi-takip",
+  "version": "1.0.0",
+  "description": "Dağ evi dolu/boş durum takip sayfası",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
