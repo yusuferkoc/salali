@@ -125,7 +125,7 @@ app.get('/api/members', (req, res) => {
 
 // POST reservation
 app.post('/api/reservations', async (req, res) => {
-  const { date, name, note } = req.body;
+  const { date, name, note, deviceId } = req.body;
 
   if (!date || !name || !name.trim()) {
     return res.status(400).json({ error: 'Tarih ve isim gerekli.' });
@@ -137,14 +137,18 @@ app.post('/api/reservations', async (req, res) => {
   // Check if reserved by someone else
   const existing = inMemoryData[date];
   if (existing && existing.name.toLowerCase() !== cleanName.toLowerCase()) {
-    return res.status(409).json({
-      error: `Bu tarih zaten ${existing.name} tarafından rezerve edilmiş.`
-    });
+    // Aynı cihazdan geliyorsa güncellemeye izin ver
+    if (!deviceId || existing.deviceId !== deviceId) {
+      return res.status(409).json({
+        error: `Bu tarih zaten ${existing.name} tarafından rezerve edilmiş.`
+      });
+    }
   }
 
   inMemoryData[date] = {
     name: cleanName,
     note: (note || '').trim(),
+    deviceId: deviceId || null,
     createdAt: new Date().toISOString()
   };
 
@@ -157,7 +161,7 @@ app.post('/api/reservations', async (req, res) => {
 // DELETE reservation
 app.delete('/api/reservations/:date', async (req, res) => {
   const { date } = req.params;
-  const { name } = req.body;
+  const { name, deviceId } = req.body;
 
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'İsim gerekli.' });
@@ -170,7 +174,11 @@ app.delete('/api/reservations/:date', async (req, res) => {
     return res.status(404).json({ error: 'Bu tarihte rezervasyon bulunamadı.' });
   }
 
-  if (existing.name.toLowerCase() !== name.trim().toLowerCase()) {
+  // Yetki kontrolü: deviceId eşleşirse VEYA legacy veri (deviceId yok) ise isim kontrolü
+  const deviceMatch = deviceId && existing.deviceId && existing.deviceId === deviceId;
+  const nameMatch = existing.name.toLowerCase() === name.trim().toLowerCase();
+
+  if (!deviceMatch && !nameMatch) {
     return res.status(403).json({ error: 'Sadece kendi rezervasyonunuzu iptal edebilirsiniz.' });
   }
 

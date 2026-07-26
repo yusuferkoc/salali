@@ -1,8 +1,10 @@
 // ========== State & Storage ==========
 let currentUser = getStorage('salali_user') || '';
 let reservations = {};
+let prevReservations = {}; // Bildirim karşılaştırması için
 let weatherCache = {}; // dateStr -> { icon, text, maxTemp, minTemp }
 let viewDate; // haftanın başlangıç tarihi (Pazartesi)
+let notificationsReady = false; // İlk yükleme tamamlanana kadar bildirim gönderme
 
 const AY = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 const GUN = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
@@ -18,6 +20,64 @@ function getStorage(key) {
 
 function setStorage(key, val) {
   try { localStorage.setItem(key, val); } catch {}
+}
+
+// ========== Cihaz ID ==========
+function getDeviceId() {
+  let id = getStorage('salali_device_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    setStorage('salali_device_id', id);
+  }
+  return id;
+}
+
+// ========== Bildirim Sistemi ==========
+function requestNotificationPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function sendNotification(title, body) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  try {
+    new Notification(title, {
+      body: body,
+      icon: '🏔️',
+      badge: '🏔️',
+      tag: 'salali-' + Date.now()
+    });
+  } catch (e) {
+    console.warn('Bildirim gönderilemedi:', e);
+  }
+}
+
+function checkReservationChanges(oldData, newData) {
+  if (!notificationsReady) return;
+  if (!oldData || Object.keys(oldData).length === 0) return;
+
+  // Yeni eklenen rezervasyonlar
+  for (const [date, r] of Object.entries(newData)) {
+    if (!oldData[date]) {
+      if (r.name.toLowerCase() !== currentUser.toLowerCase()) {
+        const [y, m, d] = date.split('-').map(Number);
+        sendNotification('📅 Yeni Rezervasyon', `${r.name} — ${d} ${AY[m - 1]} tarihini rezerve etti.`);
+      }
+    }
+  }
+
+  // Silinen rezervasyonlar
+  for (const [date, r] of Object.entries(oldData)) {
+    if (!newData[date]) {
+      if (r.name.toLowerCase() !== currentUser.toLowerCase()) {
+        const [y, m, d] = date.split('-').map(Number);
+        sendNotification('🗑️ Rezervasyon İptali', `${r.name} — ${d} ${AY[m - 1]} rezervasyonunu iptal etti.`);
+      }
+    }
+  }
 }
 
 // Haversine: mesafe hesabı (metre)
@@ -170,6 +230,9 @@ function init() {
   // Hava durumunu yükle
   loadWeather();
 
+  // Bildirim izni iste
+  requestNotificationPermission();
+
   // 15 saniyede bir otomatik veri yenileme
   setInterval(() => {
     if (currentUser) loadReservations(true);
@@ -178,6 +241,8 @@ function init() {
 
 // ========== Name Flow ==========
 async function showNameOverlay() {
+  // CSS !important override'ını devre dışı bırak
+  document.documentElement.classList.remove('has-user');
   nameOverlay.style.display = 'flex';
   appContent.style.display = 'none';
 
@@ -223,6 +288,8 @@ function onChangeName() {
 }
 
 function showApp() {
+  // CSS !important kuralını tekrar aktif et (flash önleme)
+  document.documentElement.classList.add('has-user');
   nameOverlay.style.display = 'none';
   appContent.style.display = 'block';
   userNameEl.textContent = currentUser;
@@ -234,7 +301,12 @@ async function loadReservations(silent = false) {
   try {
     const res = await fetch('/api/reservations');
     if (res.ok) {
-      reservations = await res.json();
+      const newData = await res.json();
+      // Bildirim kontrolü (ilk yükleme hariç)
+      checkReservationChanges(prevReservations, newData);
+      prevReservations = JSON.parse(JSON.stringify(newData));
+      reservations = newData;
+      if (!notificationsReady) notificationsReady = true;
       render();
     }
   } catch (e) {
@@ -247,7 +319,7 @@ async function makeReservation(dateStr, note) {
     const res = await fetch('/api/reservations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date: dateStr, name: currentUser, note })
+      body: JSON.stringify({ date: dateStr, name: currentUser, note, deviceId: getDeviceId() })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -267,7 +339,7 @@ async function cancelReservation(dateStr) {
     const res = await fetch(`/api/reservations/${dateStr}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: currentUser })
+      body: JSON.stringify({ name: currentUser, deviceId: getDeviceId() })
     });
     const data = await res.json();
     if (!res.ok) {
