@@ -55,6 +55,49 @@ function sendNotification(title, body) {
   }
 }
 
+function getReservationName(r) {
+  if (!r) return '';
+  if (r.name) return r.name;
+  const names = [];
+  if (r.day && r.day.name) names.push(`☀️ ${r.day.name}`);
+  if (r.night && r.night.name) names.push(`🌙 ${r.night.name}`);
+  return names.join(' / ');
+}
+
+function isReservationMine(r, user) {
+  if (!r || !user) return false;
+  const u = user.toLowerCase();
+  if (r.name && r.name.toLowerCase() === u) return true;
+  if (r.day && r.day.name && r.day.name.toLowerCase() === u) return true;
+  if (r.night && r.night.name && r.night.name.toLowerCase() === u) return true;
+  return false;
+}
+
+function isReservationGuest(r) {
+  if (!r) return false;
+  if (r.note && r.note.includes('Misafir için')) return true;
+  if (r.day && r.day.note && r.day.note.includes('Misafir için')) return true;
+  if (r.night && r.night.note && r.night.note.includes('Misafir için')) return true;
+  return false;
+}
+
+function getReservationNote(r) {
+  if (!r) return '';
+  if (r.note) return r.note;
+  const notes = [];
+  if (r.day && r.day.note) notes.push(`☀️ ${r.day.note}`);
+  if (r.night && r.night.note) notes.push(`🌙 ${r.night.note}`);
+  return notes.join(' | ');
+}
+
+function getReservationCreatedAt(r) {
+  if (!r) return '';
+  if (r.createdAt) return r.createdAt;
+  if (r.day && r.day.createdAt) return r.day.createdAt;
+  if (r.night && r.night.createdAt) return r.night.createdAt;
+  return '';
+}
+
 function checkReservationChanges(oldData, newData) {
   if (!notificationsReady) return;
   if (!oldData || Object.keys(oldData).length === 0) return;
@@ -62,9 +105,10 @@ function checkReservationChanges(oldData, newData) {
   // Yeni eklenen rezervasyonlar
   for (const [date, r] of Object.entries(newData)) {
     if (!oldData[date]) {
-      if (r.name.toLowerCase() !== currentUser.toLowerCase()) {
+      const resName = getReservationName(r);
+      if (!isReservationMine(r, currentUser)) {
         const [y, m, d] = date.split('-').map(Number);
-        sendNotification('📅 Yeni Rezervasyon', `${r.name} — ${d} ${AY[m - 1]} tarihini rezerve etti.`);
+        sendNotification('📅 Yeni Rezervasyon', `${resName} — ${d} ${AY[m - 1]} tarihini rezerve etti.`);
       }
     }
   }
@@ -72,9 +116,10 @@ function checkReservationChanges(oldData, newData) {
   // Silinen rezervasyonlar
   for (const [date, r] of Object.entries(oldData)) {
     if (!newData[date]) {
-      if (r.name.toLowerCase() !== currentUser.toLowerCase()) {
+      const resName = getReservationName(r);
+      if (!isReservationMine(r, currentUser)) {
         const [y, m, d] = date.split('-').map(Number);
-        sendNotification('🗑️ Rezervasyon İptali', `${r.name} — ${d} ${AY[m - 1]} rezervasyonunu iptal etti.`);
+        sendNotification('🗑️ Rezervasyon İptali', `${resName} — ${d} ${AY[m - 1]} rezervasyonunu iptal etti.`);
       }
     }
   }
@@ -419,7 +464,9 @@ function renderHero() {
   const r = reservations[todayStr];
 
   if (r) {
-    const isMine = r.name.toLowerCase() === currentUser.toLowerCase();
+    const isMine = isReservationMine(r, currentUser);
+    const resName = getReservationName(r);
+    const resNote = getReservationNote(r);
     if (isMine) {
       heroStatus.className = 'hero-status status-mine';
       heroStatus.innerHTML = '🏔️';
@@ -428,7 +475,7 @@ function renderHero() {
     } else {
       heroStatus.className = 'hero-status status-occupied';
       heroStatus.innerHTML = 'Dolu';
-      heroDetail.innerHTML = `<strong>${esc(r.name)}</strong> şu an orada${r.note ? ' (' + esc(r.note) + ')' : ''}`;
+      heroDetail.innerHTML = `<strong>${esc(resName)}</strong> şu an orada${resNote ? ' (' + esc(resNote) + ')' : ''}`;
       heroAction.innerHTML = '';
     }
   } else {
@@ -492,8 +539,12 @@ function renderUpcoming() {
     const [y, m, d] = dateStr.split('-').map(Number);
     const dateObj = new Date(y, m - 1, d);
     const dayName = GUN[dateObj.getDay()];
-    const isMine = r.name.toLowerCase() === currentUser.toLowerCase();
-    const isGuest = r.note && r.note.includes('Misafir için');
+    const isMine = isReservationMine(r, currentUser);
+    const isGuest = isReservationGuest(r);
+    const resName = getReservationName(r);
+    const resNote = getReservationNote(r);
+    const createdDate = getReservationCreatedAt(r);
+
     let dotClass = 'upcoming-dot--occupied';
     if (isGuest) dotClass = 'upcoming-dot--guest';
     else if (isMine) dotClass = 'upcoming-dot--mine';
@@ -507,13 +558,13 @@ function renderUpcoming() {
     const weatherHtml = w ? `<span style="font-size:0.8rem;margin-left:auto;color:#fbbf24;">${w.icon} ${w.maxTemp}°C</span>` : '';
 
     // Rezerve tarihi
-    const createdInfo = r.createdAt ? formatCreatedAt(r.createdAt) : '';
+    const createdInfo = createdDate ? formatCreatedAt(createdDate) : '';
 
     card.innerHTML = `
       <span class="upcoming-dot ${dotClass}"></span>
       <div class="upcoming-info">
         <div class="upcoming-date">${d} ${AY[m - 1]} · ${dayName}</div>
-        <div class="upcoming-name">${esc(r.name)}${r.note ? ' — ' + esc(r.note) : ''}</div>
+        <div class="upcoming-name">${esc(resName)}${resNote ? ' — ' + esc(resNote) : ''}</div>
         ${createdInfo ? `<div class="upcoming-created">📌 ${createdInfo}</div>` : ''}
       </div>
       ${weatherHtml}
