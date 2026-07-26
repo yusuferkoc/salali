@@ -5,7 +5,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'reservations.json');
-const CLOUD_BLOB_URL = 'https://jsonblob.com/api/jsonBlob/019f8bf4-805a-7e13-8e31-edaca3c1e5c6';
+const CLOUD_BLOB_URL = 'https://jsonblob.com/api/jsonBlob/019f9f89-9d8e-76a0-9ce3-6b26ed54a3dc';
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
