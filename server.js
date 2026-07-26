@@ -10,8 +10,9 @@ const CLOUD_BLOB_URL = 'https://jsonblob.com/api/jsonBlob/019f8bf4-805a-7e13-8e3
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// In-memory cache
+// In-memory cache & sync status flag
 let inMemoryData = null;
+let isCloudDirty = false;
 
 // Ensure data folder exists
 const dataDir = path.join(__dirname, 'data');
@@ -41,28 +42,50 @@ function writeLocalData(data) {
   }
 }
 
-// Sync with cloud JSONBlob (only on boot)
-async function syncFromCloud() {
+// Türkiye saat dilimine göre bugün tarihini YYYY-MM-DD olarak döndürür
+function getTurkeyDateStr() {
   try {
-    const res = await fetch(CLOUD_BLOB_URL, { signal: AbortSignal.timeout(5000) });
-    if (res.ok) {
-      const cloudData = await res.json();
-      if (cloudData && typeof cloudData === 'object' && !Array.isArray(cloudData)) {
-        inMemoryData = cloudData;
-        writeLocalData(cloudData);
-        console.log('☁️ Synced successfully from cloud storage.');
-        return;
-      }
-    }
-  } catch (e) {
-    console.warn('Cloud fetch warning:', e.message);
-  }
-  if (!inMemoryData) {
-    inMemoryData = readLocalData();
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
+  } catch {
+    return new Date().toISOString().split('T')[0];
   }
 }
 
-// Cloud'a yazma — 3 deneme, 2 sn aralıkla retry
+// Akıllı Veri Birleştirme (Smart Merge - Boot Açılışı)
+async function smartMergeData() {
+  const local = readLocalData() || {};
+  let cloud = {};
+
+  try {
+    const res = await fetch(CLOUD_BLOB_URL, { signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        cloud = data;
+      }
+    }
+  } catch (e) {
+    console.warn('Cloud fetch warning during boot:', e.message);
+  }
+
+  // Hem yerel hem cloud verilerini eksiksiz birleştir (Union Merge)
+  const merged = { ...cloud, ...local };
+  for (const [date, cloudRes] of Object.entries(cloud)) {
+    const localRes = local[date];
+    if (localRes && cloudRes) {
+      const cloudTime = new Date(cloudRes.createdAt || 0).getTime();
+      const localTime = new Date(localRes.createdAt || 0).getTime();
+      merged[date] = localTime >= cloudTime ? localRes : cloudRes;
+    }
+  }
+
+  inMemoryData = merged;
+  writeLocalData(inMemoryData);
+  syncToCloud(inMemoryData).catch(() => {});
+  console.log(`☁️ Smart merge tamamlandı. Toplam ${Object.keys(inMemoryData).length} rezervasyon korundu.`);
+}
+
+// Cloud'a yazma — 3 deneme, 2 sn aralıkla retry + arka plan kuyruğu
 async function syncToCloud(data, retries = 3) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -73,8 +96,9 @@ async function syncToCloud(data, retries = 3) {
         signal: AbortSignal.timeout(5000)
       });
       if (res.ok) {
+        isCloudDirty = false;
         console.log('☁️ Cloud sync başarılı.');
-        return;
+        return true;
       }
       console.error(`☁️ Cloud sync HTTP hatası: ${res.status} (deneme ${attempt}/${retries})`);
     } catch (e) {
@@ -84,13 +108,23 @@ async function syncToCloud(data, retries = 3) {
       await new Promise(r => setTimeout(r, 2000));
     }
   }
-  console.error('☁️ Cloud sync tüm denemeler başarısız oldu! Lokal veri güncel, cloud geride.');
+  isCloudDirty = true;
+  console.warn('⚠️ Cloud sync başarısız oldu. Arka plan retry kuyruğuna alındı.');
+  return false;
 }
 
-// Geçmiş rezervasyonları temizle
+// Arka plan senkronizasyon takipçisi: Cloud güncellenemediğinde her 30sn'de bir dener
+setInterval(() => {
+  if (isCloudDirty && inMemoryData) {
+    console.log('🔄 Arka plan retry: Cloud sync tekrar deneniyor...');
+    syncToCloud(inMemoryData).catch(() => {});
+  }
+}, 30000);
+
+// Geçmiş rezervasyonları temizle (Türkiye Saat Dilimi ile)
 function cleanupPastReservations() {
   if (!inMemoryData) return false;
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTurkeyDateStr();
   let changed = false;
   for (const date of Object.keys(inMemoryData)) {
     if (date < today) {
@@ -100,7 +134,8 @@ function cleanupPastReservations() {
   }
   if (changed) {
     writeLocalData(inMemoryData);
-    console.log('🧹 Geçmiş rezervasyonlar temizlendi.');
+    syncToCloud(inMemoryData).catch(() => {});
+    console.log(`🧹 Geçmiş rezervasyonlar temizlendi (TR Bugün: ${today}).`);
   }
   return changed;
 }
@@ -126,9 +161,10 @@ app.get('/api/members', (req, res) => {
 // POST reservation
 app.post('/api/reservations', async (req, res) => {
   const { date, name, note, deviceId } = req.body;
+  const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-  if (!date || !name || !name.trim()) {
-    return res.status(400).json({ error: 'Tarih ve isim gerekli.' });
+  if (!date || !DATE_REGEX.test(date) || !name || !name.trim()) {
+    return res.status(400).json({ error: 'Geçerli bir tarih (YYYY-AA-GG) ve isim gerekli.' });
   }
 
   const cleanName = name.trim();
@@ -194,9 +230,9 @@ app.get('/api/ping', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Boot: önce cloud'dan veriyi çek, sonra sunucuyu başlat
+// Boot: önce smart merge yap, sonra sunucuyu başlat
 async function startServer() {
-  await syncFromCloud();
+  await smartMergeData();
   cleanupPastReservations();
 
   // Her gün gece yarısı geçmiş rezervasyonları temizle
@@ -208,7 +244,7 @@ async function startServer() {
   app.listen(PORT, () => {
     console.log(`🏔️ Salalı Dağ Evi sunucusu çalışıyor: http://localhost:${PORT}`);
 
-    // Render Keep-Alive: 14 dakikada bir self-ping (Render 15dk sonra uyuyor)
+    // Render Keep-Alive (Eğer RENDER_EXTERNAL_URL varsa)
     const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
     if (RENDER_URL) {
       setInterval(async () => {
@@ -218,7 +254,7 @@ async function startServer() {
         } catch (e) {
           console.warn('🏓 Keep-alive ping hatası:', e.message);
         }
-      }, 14 * 60 * 1000); // 14 dakika
+      }, 14 * 60 * 1000);
       console.log('🏓 Keep-alive aktif: her 14 dakikada bir ping atılacak.');
     }
   });
