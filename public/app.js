@@ -298,19 +298,33 @@ function showApp() {
 }
 
 // ========== API Operations ==========
+let loadRetryCount = 0;
+
 async function loadReservations(silent = false) {
   try {
     const res = await fetch('/api/reservations');
     if (res.ok) {
       const newData = await res.json();
+      loadRetryCount = 0;
       // Bildirim kontrolü (ilk yükleme hariç)
       checkReservationChanges(prevReservations, newData);
       prevReservations = JSON.parse(JSON.stringify(newData));
       reservations = newData;
       if (!notificationsReady) notificationsReady = true;
       render();
+      return;
     }
-  } catch (e) {
+  } catch (e) {}
+
+  // Render uyanma veya deploy anlarında otomatik yeniden deneme
+  if (loadRetryCount < 4) {
+    loadRetryCount++;
+    if (!silent && loadRetryCount === 1) {
+      showToast('⚡ Sunucu uyanıyor, bağlanılıyor...', 'info');
+    }
+    setTimeout(() => loadReservations(silent), 2500);
+  } else {
+    loadRetryCount = 0;
     if (!silent) showToast('Bağlantı hatası. Yeniden deneniyor...', 'error');
   }
 }
