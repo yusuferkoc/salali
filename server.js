@@ -15,12 +15,15 @@ let inMemoryData = null;
 let isCloudDirty = false;
 
 // Supabase REST client configuration
-const SUPABASE_URL = process.env.SUPABASE_URL;
+let SUPABASE_URL = process.env.SUPABASE_URL;
+if (SUPABASE_URL) {
+  SUPABASE_URL = SUPABASE_URL.trim().replace(/\/$/, '').replace(/\/rest\/v1$/, '');
+}
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const isSupabaseEnabled = !!(SUPABASE_URL && SUPABASE_KEY);
 
 if (isSupabaseEnabled) {
-  console.log('✅ Supabase database support is ENABLED.');
+  console.log(`✅ Supabase database support is ENABLED. (URL: ${SUPABASE_URL})`);
 } else {
   console.warn('⚠️ Supabase environment variables missing. Falling back to local file + JSONBlob mode.');
 }
