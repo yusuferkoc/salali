@@ -145,6 +145,30 @@ async function smartMergeData() {
     try {
       inMemoryData = await fetchFromSupabase();
       console.log(`☁️ Supabase veritabanından ${Object.keys(inMemoryData).length} kayıt başarıyla yüklendi.`);
+
+      // OTOMATİK GÖÇ (MIGRATION): Eğer Supabase tamamen boşsa ve yerelde veri varsa, bunları Supabase'e yükle
+      if (Object.keys(inMemoryData).length === 0) {
+        const local = readLocalData() || {};
+        const localKeys = Object.keys(local);
+        if (localKeys.length > 0) {
+          console.log(`🚀 Supabase boş, yereldeki ${localKeys.length} adet rezervasyon Supabase'e taşınıyor...`);
+          for (const [date, res] of Object.entries(local)) {
+            try {
+              if (res.day || res.night) {
+                if (res.day) await saveToSupabase(date, res.day.name, res.day.note, 'day', res.day.deviceId, res.day.isGps);
+                if (res.night) await saveToSupabase(date, res.night.name, res.night.note, 'night', res.night.deviceId, res.night.isGps);
+              } else {
+                await saveToSupabase(date, res.name, res.note, res.slot || 'full', res.deviceId, res.isGps);
+              }
+            } catch (err) {
+              console.error(`Migration error for date ${date}:`, err.message);
+            }
+          }
+          // Tekrar Supabase'den güncel halini çek
+          inMemoryData = await fetchFromSupabase();
+          console.log(`✅ Göç işlemi (migration) başarıyla tamamlandı! Supabase'e ${Object.keys(inMemoryData).length} kayıt yüklendi.`);
+        }
+      }
       return;
     } catch (e) {
       console.error('❌ Supabase boot yükleme hatası, yerel dosyaya dönülüyor:', e.message);
