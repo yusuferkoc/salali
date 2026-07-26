@@ -187,6 +187,7 @@ app.post('/api/reservations', async (req, res) => {
     note: (note || '').trim(),
     slot: targetSlot,
     deviceId: deviceId || null,
+    isGps: !!req.body.isGps,
     createdAt: new Date().toISOString()
   };
 

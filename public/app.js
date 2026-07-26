@@ -374,7 +374,7 @@ async function loadReservations(silent = false) {
   }
 }
 
-async function makeReservation(dateStr, note, slot) {
+async function makeReservation(dateStr, note, slot, isGps) {
   const btn = document.querySelector('#modalBody .modal-btn--reserve');
   let originalHtml = '';
   if (btn) {
@@ -387,7 +387,7 @@ async function makeReservation(dateStr, note, slot) {
     const res = await fetch('/api/reservations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date: dateStr, name: currentUser, note, slot: slot || modalSlot || 'full', deviceId: getDeviceId() })
+      body: JSON.stringify({ date: dateStr, name: currentUser, note, slot: slot || modalSlot || 'full', deviceId: getDeviceId(), isGps: !!isGps })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -740,6 +740,7 @@ function openDayModal(dateStr, day, month, year, r) {
         html += `<div class="modal-status-badge ${isMine ? 's-mine' : 's-occupied'}">☀️ Gündüz (Piknik) — ${esc(r.day.name)}</div>`;
         if (r.day.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.day.note)}</div>`;
         if (r.day.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.day.createdAt)}</div>`;
+        if (r.day.isGps) html += `<div class="modal-info" style="color:var(--green);font-weight:600;margin-bottom:8px;font-size:0.78rem;">📍 GPS ile Dağ Evi'nden doğrulandı</div>`;
         if (isMine) html += `<button class="modal-btn modal-btn--cancel" onclick="cancelReservation('${dateStr}', 'day')" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;"><i data-lucide="x-circle" style="width:18px;"></i> Gündüzü İptal Et</button>`;
       }
       if (r.night) {
@@ -747,6 +748,7 @@ function openDayModal(dateStr, day, month, year, r) {
         html += `<div class="modal-status-badge ${isMine ? 's-mine' : 's-occupied'}">🌙 Akşam & Gece — ${esc(r.night.name)}</div>`;
         if (r.night.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.night.note)}</div>`;
         if (r.night.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.night.createdAt)}</div>`;
+        if (r.night.isGps) html += `<div class="modal-info" style="color:var(--green);font-weight:600;margin-bottom:8px;font-size:0.78rem;">📍 GPS ile Dağ Evi'nden doğrulandı</div>`;
         if (isMine) html += `<button class="modal-btn modal-btn--cancel" onclick="cancelReservation('${dateStr}', 'night')" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;"><i data-lucide="x-circle" style="width:18px;"></i> Akşamı İptal Et</button>`;
       }
       // Boş kalan slot varsa rezervasyon butonu göster
@@ -779,6 +781,7 @@ function openDayModal(dateStr, day, month, year, r) {
       html += `<div class="modal-status-badge ${cls}">${icon} ${slotName} — ${esc(r.name)}</div>`;
       if (r.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.note)}</div>`;
       if (r.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.createdAt)}</div>`;
+      if (r.isGps) html += `<div class="modal-info" style="color:var(--green);font-weight:600;margin-bottom:8px;font-size:0.78rem;">📍 GPS ile Dağ Evi'nden doğrulandı</div>`;
       if (isMine) html += `<button class="modal-btn modal-btn--cancel" onclick="cancelReservation('${dateStr}', '${r.slot || 'full'}')" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;"><i data-lucide="x-circle" style="width:18px;"></i> İptal Et</button>`;
 
       // Tekil slot day ise night boş; night ise day boş
@@ -903,8 +906,9 @@ function closeModal() {
 // Son onay: GPS kontrol + Kendim/Misafir
 async function onFinalReserve(dateStr) {
   try {
+    const isGps = modalReserveMode === 'here';
     // GPS kontrolü sadece "here" modunda
-    if (modalReserveMode === 'here') {
+    if (isGps) {
       await verifyLocation();
     }
 
@@ -916,7 +920,7 @@ async function onFinalReserve(dateStr) {
       note = note ? `Misafir için · ${note}` : 'Misafir için';
     }
 
-    await makeReservation(dateStr, note);
+    await makeReservation(dateStr, note, modalSlot, isGps);
   } catch (msg) {
     showToast(msg, 'error');
   }
