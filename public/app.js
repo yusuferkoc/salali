@@ -896,6 +896,10 @@ function setModalReserveType(type) {
   });
 }
 
+function closeModal() {
+  modalBg.classList.remove('show');
+}
+
 // Son onay: GPS kontrol + Kendim/Misafir
 async function onFinalReserve(dateStr) {
   try {
