@@ -674,13 +674,13 @@ function buildSlotSelectHtml(avail = { full: true, day: true, night: true }) {
   if (!avail.full && avail.day && modalSlot === 'full') modalSlot = 'day';
 
   return `<div class="slot-select-tags">
-    ${avail.full ? `<button type="button" class="slot-tag ${modalSlot === 'full' ? 'active' : ''}" onclick="setModalSlot('full')">
+    ${avail.full ? `<button type="button" data-slot="full" class="slot-tag ${modalSlot === 'full' ? 'active' : ''}" onclick="setModalSlot('full')">
       <span class="slot-icon">🏡</span> Tam Gün
     </button>` : ''}
-    ${avail.day ? `<button type="button" class="slot-tag ${modalSlot === 'day' ? 'active' : ''}" onclick="setModalSlot('day')">
+    ${avail.day ? `<button type="button" data-slot="day" class="slot-tag ${modalSlot === 'day' ? 'active' : ''}" onclick="setModalSlot('day')">
       <span class="slot-icon">☀️</span> Gündüz <span class="slot-desc">(Piknik)</span>
     </button>` : ''}
-    ${avail.night ? `<button type="button" class="slot-tag ${modalSlot === 'night' ? 'active' : ''}" onclick="setModalSlot('night')">
+    ${avail.night ? `<button type="button" data-slot="night" class="slot-tag ${modalSlot === 'night' ? 'active' : ''}" onclick="setModalSlot('night')">
       <span class="slot-icon">🌙</span> Akşam & Gece
     </button>` : ''}
   </div>`;
@@ -689,19 +689,21 @@ function buildSlotSelectHtml(avail = { full: true, day: true, night: true }) {
 function setModalSlot(slot) {
   modalSlot = slot;
   const tags = document.querySelectorAll('#modalBody .slot-select-tags .slot-tag');
-  tags.forEach(t => t.classList.remove('active'));
-  if (slot === 'full' && tags[0]) tags[0].classList.add('active');
-  if (slot === 'day' && tags[1]) tags[1].classList.add('active');
-  if (slot === 'night' && tags[2]) tags[2].classList.add('active');
+  tags.forEach(t => {
+    t.classList.remove('active');
+    if (t.getAttribute('data-slot') === slot) {
+      t.classList.add('active');
+    }
+  });
 }
 
 // Kendim/Misafir HTML bloğunu oluştur
 function buildKendimMisafirHtml() {
   return `<div class="reserve-type-tags">
-    <button type="button" class="reserve-type-tag active" onclick="setModalReserveType('self')">
+    <button type="button" data-type="self" class="reserve-type-tag ${modalReserveType === 'self' ? 'active' : ''}" onclick="setModalReserveType('self')">
       <span class="tag-icon">🙋</span> Kendim
     </button>
-    <button type="button" class="reserve-type-tag" onclick="setModalReserveType('guest')">
+    <button type="button" data-type="guest" class="reserve-type-tag ${modalReserveType === 'guest' ? 'active' : ''}" onclick="setModalReserveType('guest')">
       <span class="tag-icon">👤</span> Misafir
     </button>
   </div>`;
@@ -824,6 +826,9 @@ function openDayModal(dateStr, day, month, year, r) {
     }
   }
 
+  // Mobil uyumlu kapatma butonu
+  html += `<button type="button" class="modal-btn" onclick="closeModal()" style="margin-top:10px;background:rgba(255,255,255,0.06);color:var(--text-dim);border:1px solid var(--glass-border);display:flex;align-items:center;justify-content:center;">Kapat</button>`;
+
   modalBody.innerHTML = html;
   modalBg.classList.add('show');
   if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -872,6 +877,9 @@ function openReserveStepModal(dateStr, day, month, year, mode) {
     html += `<button class="modal-btn modal-btn--reserve" onclick="onFinalReserve('${dateStr}')" style="display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="calendar-plus" style="width:18px;"></i> Onayla</button>`;
   }
 
+  // Mobil uyumlu kapatma butonu
+  html += `<button type="button" class="modal-btn" onclick="closeModal()" style="margin-top:10px;background:rgba(255,255,255,0.06);color:var(--text-dim);border:1px solid var(--glass-border);display:flex;align-items:center;justify-content:center;">Kapat</button>`;
+
   modalBody.innerHTML = html;
   modalBg.classList.add('show');
   if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -880,12 +888,12 @@ function openReserveStepModal(dateStr, day, month, year, mode) {
 function setModalReserveType(type) {
   modalReserveType = type;
   const tags = document.querySelectorAll('#modalBody .reserve-type-tags .reserve-type-tag');
-  tags.forEach(t => t.classList.remove('active'));
-  if (type === 'self') {
-    tags[0].classList.add('active');
-  } else {
-    tags[1].classList.add('active');
-  }
+  tags.forEach(t => {
+    t.classList.remove('active');
+    if (t.getAttribute('data-type') === type) {
+      t.classList.add('active');
+    }
+  });
 }
 
 // Son onay: GPS kontrol + Kendim/Misafir

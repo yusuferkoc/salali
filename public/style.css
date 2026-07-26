@@ -686,20 +686,27 @@ body {
 
 .modal-x {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 30px;
-  height: 30px;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
   border: 1px solid var(--glass-border);
   color: var(--text-dim);
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  z-index: 20;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.modal-x:active {
+  transform: scale(0.9);
 }
 
 .modal-x:hover { background: var(--red-soft); color: var(--red); border-color: rgba(248,113,113,0.3); }
