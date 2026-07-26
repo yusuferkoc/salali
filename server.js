@@ -153,14 +153,23 @@ app.get('/api/members', (req, res) => {
   const data = inMemoryData || readLocalData();
   const names = new Set();
   Object.values(data).forEach(r => {
-    if (r && r.name) names.add(r.name.trim());
+    if (!r) return;
+    if (r.name) names.add(r.name.trim());
+    if (r.day && r.day.name) names.add(r.day.name.trim());
+    if (r.night && r.night.name) names.add(r.night.name.trim());
   });
   res.json(Array.from(names));
 });
 
+// Helper: tekil rezervasyon nesnesinin slotunu döndürür ('full', 'day', 'night')
+function getReservationSlot(item) {
+  if (!item) return null;
+  return item.slot || 'full';
+}
+
 // POST reservation
 app.post('/api/reservations', async (req, res) => {
-  const { date, name, note, deviceId } = req.body;
+  const { date, name, note, slot, deviceId } = req.body;
   const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
   if (!date || !DATE_REGEX.test(date) || !name || !name.trim()) {
@@ -168,25 +177,75 @@ app.post('/api/reservations', async (req, res) => {
   }
 
   const cleanName = name.trim();
+  const targetSlot = (slot === 'day' || slot === 'night') ? slot : 'full';
   if (!inMemoryData) inMemoryData = readLocalData();
 
-  // Check if reserved by someone else
   const existing = inMemoryData[date];
-  if (existing && existing.name.toLowerCase() !== cleanName.toLowerCase()) {
-    // Aynı cihazdan geliyorsa güncellemeye izin ver
-    if (!deviceId || existing.deviceId !== deviceId) {
-      return res.status(409).json({
-        error: `Bu tarih zaten ${existing.name} tarafından rezerve edilmiş.`
-      });
-    }
-  }
 
-  inMemoryData[date] = {
+  const newRes = {
     name: cleanName,
     note: (note || '').trim(),
+    slot: targetSlot,
     deviceId: deviceId || null,
     createdAt: new Date().toISOString()
   };
+
+  if (existing) {
+    // 1. Durum: Mevcut kayıt çift slotlu nesne ise ({ day: {...}, night: {...} })
+    if (existing.day || existing.night) {
+      if (targetSlot === 'full') {
+        return res.status(409).json({ error: 'Bu günün saatleri zaten kısmen rezerve edilmiş. Tam gün alınamaz.' });
+      }
+      const currentSlotRes = existing[targetSlot];
+      if (currentSlotRes && currentSlotRes.name.toLowerCase() !== cleanName.toLowerCase()) {
+        if (!deviceId || currentSlotRes.deviceId !== deviceId) {
+          const slotLabel = targetSlot === 'day' ? 'Gündüz (Piknik)' : 'Akşam & Gece';
+          return res.status(409).json({ error: `Bu tarihte ${slotLabel} zaten ${currentSlotRes.name} tarafından rezerve edilmiş.` });
+        }
+      }
+      existing[targetSlot] = newRes;
+    } else {
+      // 2. Durum: Mevcut kayıt tekil nesne ise ({ name, slot, ... })
+      const existingSlot = getReservationSlot(existing);
+      const isSameUser = existing.name.toLowerCase() === cleanName.toLowerCase() || (deviceId && existing.deviceId === deviceId);
+
+      if (isSameUser) {
+        // Aynı kullanıcı/cihaz güncelliyor
+        if (targetSlot === 'full') {
+          inMemoryData[date] = newRes;
+        } else if (existingSlot === targetSlot || existingSlot === 'full') {
+          inMemoryData[date] = newRes;
+        } else {
+          // Farklı slot eklendi (örneğin önceden day vardı, şimdi night ekliyor)
+          inMemoryData[date] = {
+            [existingSlot]: existing,
+            [targetSlot]: newRes
+          };
+        }
+      } else {
+        // Başka bir kullanıcı
+        if (existingSlot === 'full' || targetSlot === 'full' || existingSlot === targetSlot) {
+          const slotLabel = existingSlot === 'full' ? 'Tam Gün' : (existingSlot === 'day' ? 'Gündüz' : 'Akşam');
+          return res.status(409).json({ error: `Bu tarih (${slotLabel}) zaten ${existing.name} tarafından rezerve edilmiş.` });
+        } else {
+          // Çakışmayan slotlar (Biri day, diğeri night) -> İkisini de sakla!
+          inMemoryData[date] = {
+            [existingSlot]: existing,
+            [targetSlot]: newRes
+          };
+        }
+      }
+    }
+  } else {
+    // 3. Durum: Bu tarihte hiç kayıt yok
+    if (targetSlot === 'full') {
+      inMemoryData[date] = newRes;
+    } else {
+      inMemoryData[date] = {
+        [targetSlot]: newRes
+      };
+    }
+  }
 
   writeLocalData(inMemoryData);
   syncToCloud(inMemoryData).catch(() => {});
@@ -197,7 +256,7 @@ app.post('/api/reservations', async (req, res) => {
 // DELETE reservation
 app.delete('/api/reservations/:date', async (req, res) => {
   const { date } = req.params;
-  const { name, deviceId } = req.body;
+  const { name, slot, deviceId } = req.body;
 
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'İsim gerekli.' });
@@ -210,15 +269,54 @@ app.delete('/api/reservations/:date', async (req, res) => {
     return res.status(404).json({ error: 'Bu tarihte rezervasyon bulunamadı.' });
   }
 
-  // Yetki kontrolü: deviceId eşleşirse VEYA legacy veri (deviceId yok) ise isim kontrolü
-  const deviceMatch = deviceId && existing.deviceId && existing.deviceId === deviceId;
-  const nameMatch = existing.name.toLowerCase() === name.trim().toLowerCase();
+  const targetSlot = (slot === 'day' || slot === 'night') ? slot : null;
 
-  if (!deviceMatch && !nameMatch) {
-    return res.status(403).json({ error: 'Sadece kendi rezervasyonunuzu iptal edebilirsiniz.' });
+  // 1. Çift slotlu kayıt silme
+  if (existing.day || existing.night) {
+    if (targetSlot && existing[targetSlot]) {
+      const item = existing[targetSlot];
+      const deviceMatch = deviceId && item.deviceId && item.deviceId === deviceId;
+      const nameMatch = item.name.toLowerCase() === name.trim().toLowerCase();
+      if (!deviceMatch && !nameMatch) {
+        return res.status(403).json({ error: 'Sadece kendi rezervasyonunuzu iptal edebilirsiniz.' });
+      }
+      delete existing[targetSlot];
+      // Eğer tek slot kaldıysa onu tekil hale getir
+      const remaining = existing.day ? 'day' : (existing.night ? 'night' : null);
+      if (!remaining) {
+        delete inMemoryData[date];
+      }
+    } else {
+      // Slot belirtilmediyse her iki slotu da yetki kontrolü ile dene
+      let deletedCount = 0;
+      ['day', 'night'].forEach(s => {
+        if (existing[s]) {
+          const item = existing[s];
+          const deviceMatch = deviceId && item.deviceId && item.deviceId === deviceId;
+          const nameMatch = item.name.toLowerCase() === name.trim().toLowerCase();
+          if (deviceMatch || nameMatch) {
+            delete existing[s];
+            deletedCount++;
+          }
+        }
+      });
+      if (!existing.day && !existing.night) {
+        delete inMemoryData[date];
+      }
+      if (deletedCount === 0) {
+        return res.status(403).json({ error: 'Sadece kendi rezervasyonunuzu iptal edebilirsiniz.' });
+      }
+    }
+  } else {
+    // 2. Tekil kayıt silme
+    const deviceMatch = deviceId && existing.deviceId && existing.deviceId === deviceId;
+    const nameMatch = existing.name.toLowerCase() === name.trim().toLowerCase();
+    if (!deviceMatch && !nameMatch) {
+      return res.status(403).json({ error: 'Sadece kendi rezervasyonunuzu iptal edebilirsiniz.' });
+    }
+    delete inMemoryData[date];
   }
 
-  delete inMemoryData[date];
   writeLocalData(inMemoryData);
   syncToCloud(inMemoryData).catch(() => {});
 

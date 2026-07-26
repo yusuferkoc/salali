@@ -315,7 +315,7 @@ async function loadReservations(silent = false) {
   }
 }
 
-async function makeReservation(dateStr, note) {
+async function makeReservation(dateStr, note, slot) {
   const btn = document.querySelector('#modalBody .modal-btn--reserve');
   let originalHtml = '';
   if (btn) {
@@ -328,7 +328,7 @@ async function makeReservation(dateStr, note) {
     const res = await fetch('/api/reservations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date: dateStr, name: currentUser, note, deviceId: getDeviceId() })
+      body: JSON.stringify({ date: dateStr, name: currentUser, note, slot: slot || modalSlot || 'full', deviceId: getDeviceId() })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -345,7 +345,7 @@ async function makeReservation(dateStr, note) {
   }
 }
 
-async function cancelReservation(dateStr) {
+async function cancelReservation(dateStr, slot) {
   const btn = document.querySelector('#modalBody .modal-btn--cancel') || document.querySelector('#heroAction .btn-hero--cancel');
   let originalHtml = '';
   if (btn) {
@@ -358,7 +358,7 @@ async function cancelReservation(dateStr) {
     const res = await fetch(`/api/reservations/${dateStr}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: currentUser, deviceId: getDeviceId() })
+      body: JSON.stringify({ name: currentUser, slot: slot || null, deviceId: getDeviceId() })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -549,15 +549,26 @@ function renderCalendar() {
     if (isPast) cls += ' cal-day--past';
     if (isToday) cls += ' cal-day--today';
 
+    let dayLabelHtml = '';
+
     if (r) {
-      const isMine = r.name.toLowerCase() === currentUser.toLowerCase();
-      const isGuest = r.note && r.note.includes('Misafir için');
-      if (isGuest) {
-        cls += ' cal-day--guest';
-      } else if (isMine) {
-        cls += ' cal-day--mine';
+      if (r.day || r.night) {
+        // Çift slotlu gün
+        cls += ' cal-day--split';
+        const dayNameText = r.day ? r.day.name : '';
+        const nightNameText = r.night ? r.night.name : '';
+        const combined = [dayNameText, nightNameText].filter(Boolean).join('/');
+        dayLabelHtml = `<div class="cal-day-slots"><span class="cal-slot-dot">☀️</span><span class="cal-slot-dot">🌙</span></div><span class="cal-day-name">${esc(combined)}</span>`;
       } else {
-        cls += ' cal-day--occupied';
+        // Tekil slotlu gün
+        const isMine = r.name.toLowerCase() === currentUser.toLowerCase();
+        const isGuest = r.note && r.note.includes('Misafir için');
+        if (isGuest) cls += ' cal-day--guest';
+        else if (isMine) cls += ' cal-day--mine';
+        else cls += ' cal-day--occupied';
+
+        const prefix = r.slot === 'day' ? '☀️ ' : (r.slot === 'night' ? '🌙 ' : '');
+        dayLabelHtml = `<span class="cal-day-name">${prefix}${esc(r.name)}</span>`;
       }
     } else if (!isPast) {
       cls += ' cal-day--free';
@@ -572,7 +583,7 @@ function renderCalendar() {
 
     el.innerHTML = `
       <span class="cal-day-num">${d}</span>
-      ${r ? `<span class="cal-day-name">${esc(r.name)}</span>` : weatherBadge}
+      ${r ? dayLabelHtml : weatherBadge}
     `;
 
     if (!isPast) {
@@ -586,6 +597,49 @@ function renderCalendar() {
 function navWeek(dir) {
   viewDate.setDate(viewDate.getDate() + (dir * 14));
   renderCalendar();
+}
+
+// ========== İki Adımlı Rezervasyon Akışı ==========
+let modalReserveType = 'self';
+let modalReserveMode = 'coming'; // 'here' veya 'coming'
+let modalSlot = 'full'; // 'full', 'day', 'night'
+
+function buildSlotSelectHtml(avail = { full: true, day: true, night: true }) {
+  if (!avail.full && avail.night && modalSlot === 'full') modalSlot = 'night';
+  if (!avail.full && avail.day && modalSlot === 'full') modalSlot = 'day';
+
+  return `<div class="slot-select-tags">
+    ${avail.full ? `<button type="button" class="slot-tag ${modalSlot === 'full' ? 'active' : ''}" onclick="setModalSlot('full')">
+      <span class="slot-icon">🏡</span> Tam Gün
+    </button>` : ''}
+    ${avail.day ? `<button type="button" class="slot-tag ${modalSlot === 'day' ? 'active' : ''}" onclick="setModalSlot('day')">
+      <span class="slot-icon">☀️</span> Gündüz <span class="slot-desc">(Piknik)</span>
+    </button>` : ''}
+    ${avail.night ? `<button type="button" class="slot-tag ${modalSlot === 'night' ? 'active' : ''}" onclick="setModalSlot('night')">
+      <span class="slot-icon">🌙</span> Akşam & Gece
+    </button>` : ''}
+  </div>`;
+}
+
+function setModalSlot(slot) {
+  modalSlot = slot;
+  const tags = document.querySelectorAll('#modalBody .slot-select-tags .slot-tag');
+  tags.forEach(t => t.classList.remove('active'));
+  if (slot === 'full' && tags[0]) tags[0].classList.add('active');
+  if (slot === 'day' && tags[1]) tags[1].classList.add('active');
+  if (slot === 'night' && tags[2]) tags[2].classList.add('active');
+}
+
+// Kendim/Misafir HTML bloğunu oluştur
+function buildKendimMisafirHtml() {
+  return `<div class="reserve-type-tags">
+    <button type="button" class="reserve-type-tag active" onclick="setModalReserveType('self')">
+      <span class="tag-icon">🙋</span> Kendim
+    </button>
+    <button type="button" class="reserve-type-tag" onclick="setModalReserveType('guest')">
+      <span class="tag-icon">👤</span> Misafir
+    </button>
+  </div>`;
 }
 
 // ========== Modal Dialog ==========
@@ -612,21 +666,83 @@ function openDayModal(dateStr, day, month, year, r) {
   }
 
   if (r) {
-    const isMine = r.name.toLowerCase() === currentUser.toLowerCase();
-    const cls = isMine ? 's-mine' : 's-occupied';
-    const icon = isMine ? '🔵' : '🔴';
-    const label = isMine ? (isToday ? 'Şu An Sen Oradasın' : 'Senin Planın') : 'Dolu';
+    // 1. Durum: Çift slotlu nesne ({ day: {...}, night: {...} })
+    if (r.day || r.night) {
+      if (r.day) {
+        const isMine = r.day.name.toLowerCase() === currentUser.toLowerCase();
+        html += `<div class="modal-status-badge ${isMine ? 's-mine' : 's-occupied'}">☀️ Gündüz (Piknik) — ${esc(r.day.name)}</div>`;
+        if (r.day.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.day.note)}</div>`;
+        if (r.day.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.day.createdAt)}</div>`;
+        if (isMine) html += `<button class="modal-btn modal-btn--cancel" onclick="cancelReservation('${dateStr}', 'day')" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;"><i data-lucide="x-circle" style="width:18px;"></i> Gündüzü İptal Et</button>`;
+      }
+      if (r.night) {
+        const isMine = r.night.name.toLowerCase() === currentUser.toLowerCase();
+        html += `<div class="modal-status-badge ${isMine ? 's-mine' : 's-occupied'}">🌙 Akşam & Gece — ${esc(r.night.name)}</div>`;
+        if (r.night.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.night.note)}</div>`;
+        if (r.night.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.night.createdAt)}</div>`;
+        if (isMine) html += `<button class="modal-btn modal-btn--cancel" onclick="cancelReservation('${dateStr}', 'night')" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;"><i data-lucide="x-circle" style="width:18px;"></i> Akşamı İptal Et</button>`;
+      }
+      // Boş kalan slot varsa rezervasyon butonu göster
+      if (!r.day) {
+        modalReserveType = 'self';
+        modalReserveMode = 'coming';
+        modalSlot = 'day';
+        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--green);">☀️ Gündüz saatleri boş!</div>`;
+        html += buildSlotSelectHtml({ full: false, day: true, night: false });
+        html += buildKendimMisafirHtml();
+        html += `<textarea class="modal-note-input" id="reserveNote" rows="2" placeholder="Not ekle (opsiyonel)..."></textarea>`;
+        html += `<button class="modal-btn modal-btn--reserve" onclick="onFinalReserve('${dateStr}')" style="display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="calendar-plus" style="width:18px;"></i> Gündüzü Rezerve Et</button>`;
+      } else if (!r.night) {
+        modalReserveType = 'self';
+        modalReserveMode = 'coming';
+        modalSlot = 'night';
+        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--blue);">🌙 Akşam saatleri boş!</div>`;
+        html += buildSlotSelectHtml({ full: false, day: false, night: true });
+        html += buildKendimMisafirHtml();
+        html += `<textarea class="modal-note-input" id="reserveNote" rows="2" placeholder="Not ekle (opsiyonel)..."></textarea>`;
+        html += `<button class="modal-btn modal-btn--reserve" onclick="onFinalReserve('${dateStr}')" style="display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="calendar-plus" style="width:18px;"></i> Akşamı Rezerve Et</button>`;
+      }
+    } else {
+      // 2. Durum: Tekil nesne ({ name, slot, ... })
+      const isMine = r.name.toLowerCase() === currentUser.toLowerCase();
+      const cls = isMine ? 's-mine' : 's-occupied';
+      const icon = isMine ? '🔵' : '🔴';
+      const slotName = r.slot === 'day' ? '☀️ Gündüz (Piknik)' : (r.slot === 'night' ? '🌙 Akşam & Gece' : '🏡 Tam Gün');
 
-    html += `<div class="modal-status-badge ${cls}">${icon} ${label}</div>`;
-    html += `<div class="modal-info"><strong>Kim:</strong> ${esc(r.name)}</div>`;
-    if (r.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.note)}</div>`;
-    if (r.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.createdAt)}</div>`;
-    if (isMine) html += `<button class="modal-btn modal-btn--cancel" onclick="cancelReservation('${dateStr}')" style="display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="x-circle" style="width:18px;"></i> İptal Et</button>`;
+      html += `<div class="modal-status-badge ${cls}">${icon} ${slotName} — ${esc(r.name)}</div>`;
+      if (r.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.note)}</div>`;
+      if (r.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.createdAt)}</div>`;
+      if (isMine) html += `<button class="modal-btn modal-btn--cancel" onclick="cancelReservation('${dateStr}', '${r.slot || 'full'}')" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;"><i data-lucide="x-circle" style="width:18px;"></i> İptal Et</button>`;
+
+      // Tekil slot day ise night boş; night ise day boş
+      if (r.slot === 'day') {
+        modalReserveType = 'self';
+        modalReserveMode = 'coming';
+        modalSlot = 'night';
+        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--blue);">🌙 Akşam & Gece saati boş!</div>`;
+        html += buildSlotSelectHtml({ full: false, day: false, night: true });
+        html += buildKendimMisafirHtml();
+        html += `<textarea class="modal-note-input" id="reserveNote" rows="2" placeholder="Not ekle (opsiyonel)..."></textarea>`;
+        html += `<button class="modal-btn modal-btn--reserve" onclick="onFinalReserve('${dateStr}')" style="display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="calendar-plus" style="width:18px;"></i> Akşamı Rezerve Et</button>`;
+      } else if (r.slot === 'night') {
+        modalReserveType = 'self';
+        modalReserveMode = 'coming';
+        modalSlot = 'day';
+        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--green);">☀️ Gündüz saati boş!</div>`;
+        html += buildSlotSelectHtml({ full: false, day: true, night: false });
+        html += buildKendimMisafirHtml();
+        html += `<textarea class="modal-note-input" id="reserveNote" rows="2" placeholder="Not ekle (opsiyonel)..."></textarea>`;
+        html += `<button class="modal-btn modal-btn--reserve" onclick="onFinalReserve('${dateStr}')" style="display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="calendar-plus" style="width:18px;"></i> Gündüzü Rezerve Et</button>`;
+      }
+    }
   } else {
+    // 3. Durum: Gün tamamen boş
     html += `<div class="modal-status-badge s-free">🟢 Müsait</div>`;
+    modalReserveType = 'self';
+    modalReserveMode = 'coming';
+    modalSlot = 'full';
 
     if (isToday) {
-      // Bugün: İlk adım — Buradayım ve Gideceğim seçenekleri
       html += `<div class="modal-choice-buttons">
         <button class="modal-btn modal-btn--reserve" onclick="openReserveStepModal('${dateStr}', ${day}, ${month}, ${year}, 'here')" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;">
           <i data-lucide="map-pin" style="width:18px;"></i> Buradayım (GPS)
@@ -636,9 +752,7 @@ function openDayModal(dateStr, day, month, year, r) {
         </button>
       </div>`;
     } else {
-      // Gelecek günler: Direkt Kendim/Misafir seçimi
-      modalReserveType = 'self';
-      modalReserveMode = 'coming';
+      html += buildSlotSelectHtml({ full: true, day: true, night: true });
       html += buildKendimMisafirHtml();
       html += `<textarea class="modal-note-input" id="reserveNote" rows="2" placeholder="Not ekle (opsiyonel)..."></textarea>`;
       html += `<button class="modal-btn modal-btn--reserve" onclick="onFinalReserve('${dateStr}')" style="display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="calendar-plus" style="width:18px;"></i> Gideceğim</button>`;
@@ -648,24 +762,6 @@ function openDayModal(dateStr, day, month, year, r) {
   modalBody.innerHTML = html;
   modalBg.classList.add('show');
   if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-function closeModal() { modalBg.classList.remove('show'); }
-
-// ========== İki Adımlı Rezervasyon Akışı ==========
-let modalReserveType = 'self';
-let modalReserveMode = 'coming'; // 'here' veya 'coming'
-
-// Kendim/Misafir HTML bloğunu oluştur
-function buildKendimMisafirHtml() {
-  return `<div class="reserve-type-tags">
-    <button type="button" class="reserve-type-tag active" onclick="setModalReserveType('self')">
-      <span class="tag-icon">🙋</span> Kendim
-    </button>
-    <button type="button" class="reserve-type-tag" onclick="setModalReserveType('guest')">
-      <span class="tag-icon">👤</span> Misafir
-    </button>
-  </div>`;
 }
 
 // Buradayım / Gideceğim tıklandıktan sonra Kendim/Misafir adımı
@@ -694,6 +790,9 @@ function openReserveStepModal(dateStr, day, month, year, mode) {
   } else {
     html += `<div class="modal-status-badge s-free">📅 Gideceğim</div>`;
   }
+
+  // Slot seçimi (Tam Gün / Gündüz / Akşam)
+  html += buildSlotSelectHtml({ full: true, day: true, night: true });
 
   // Kendim / Misafir tag'ları
   html += buildKendimMisafirHtml();
