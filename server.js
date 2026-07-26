@@ -14,6 +14,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 let inMemoryData = null;
 let isCloudDirty = false;
 
+// Supabase REST client configuration
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const isSupabaseEnabled = !!(SUPABASE_URL && SUPABASE_KEY);
+
+if (isSupabaseEnabled) {
+  console.log('✅ Supabase database support is ENABLED.');
+} else {
+  console.warn('⚠️ Supabase environment variables missing. Falling back to local file + JSONBlob mode.');
+}
+
 // Ensure data folder exists
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {
@@ -51,8 +62,92 @@ function getTurkeyDateStr() {
   }
 }
 
+// --- Supabase REST API Helpers ---
+async function fetchFromSupabase() {
+  const url = `${SUPABASE_URL}/rest/v1/reservations?select=*`;
+  const res = await fetch(url, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`
+    }
+  });
+  if (!res.ok) throw new Error(`Supabase GET error: ${res.status}`);
+  const rows = await res.json();
+  
+  const data = {};
+  rows.forEach(row => {
+    const { date, slot, name, note, device_id, is_gps, created_at } = row;
+    const formattedItem = {
+      name,
+      note: note || '',
+      slot,
+      deviceId: device_id,
+      isGps: !!is_gps,
+      createdAt: created_at
+    };
+
+    if (slot === 'full') {
+      data[date] = formattedItem;
+    } else {
+      if (!data[date]) data[date] = {};
+      data[date][slot] = formattedItem;
+    }
+  });
+  return data;
+}
+
+async function saveToSupabase(date, name, note, slot, deviceId, isGps) {
+  const url = `${SUPABASE_URL}/rest/v1/reservations`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates'
+    },
+    body: JSON.stringify({
+      date,
+      slot,
+      name,
+      note: note || '',
+      device_id: deviceId || null,
+      is_gps: !!isGps
+    })
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Supabase POST error: ${res.status} - ${errText}`);
+  }
+}
+
+async function deleteFromSupabase(date, slot) {
+  let url = `${SUPABASE_URL}/rest/v1/reservations?date=eq.${date}`;
+  if (slot) {
+    url += `&slot=eq.${slot}`;
+  }
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`
+    }
+  });
+  if (!res.ok) throw new Error(`Supabase DELETE error: ${res.status}`);
+}
+
 // Akıllı Veri Birleştirme (Smart Merge - Boot Açılışı)
 async function smartMergeData() {
+  if (isSupabaseEnabled) {
+    try {
+      inMemoryData = await fetchFromSupabase();
+      console.log(`☁️ Supabase veritabanından ${Object.keys(inMemoryData).length} kayıt başarıyla yüklendi.`);
+      return;
+    } catch (e) {
+      console.error('❌ Supabase boot yükleme hatası, yerel dosyaya dönülüyor:', e.message);
+    }
+  }
+
   const local = readLocalData() || {};
   let cloud = {};
 
@@ -68,7 +163,6 @@ async function smartMergeData() {
     console.warn('Cloud fetch warning during boot:', e.message);
   }
 
-  // Hem yerel hem cloud verilerini eksiksiz birleştir (Union Merge)
   const merged = { ...cloud, ...local };
   for (const [date, cloudRes] of Object.entries(cloud)) {
     const localRes = local[date];
@@ -82,11 +176,12 @@ async function smartMergeData() {
   inMemoryData = merged;
   writeLocalData(inMemoryData);
   syncToCloud(inMemoryData).catch(() => {});
-  console.log(`☁️ Smart merge tamamlandı. Toplam ${Object.keys(inMemoryData).length} rezervasyon korundu.`);
+  console.log(`☁️ Smart merge tamamlandı. Toplam ${Object.keys(inMemoryData).length} yerel rezervasyon korundu.`);
 }
 
-// Cloud'a yazma — 3 deneme, 2 sn aralıkla retry + arka plan kuyruğu
+// Cloud'a yazma — 3 deneme, 2 sn aralıkla retry + arka plan kuyruğu (Fallback modu için)
 async function syncToCloud(data, retries = 3) {
+  if (isSupabaseEnabled) return true; // Supabase aktifken JSONBlob'a senkronize etme
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const res = await fetch(CLOUD_BLOB_URL, {
@@ -113,18 +208,38 @@ async function syncToCloud(data, retries = 3) {
   return false;
 }
 
-// Arka plan senkronizasyon takipçisi: Cloud güncellenemediğinde her 30sn'de bir dener
+// Arka plan senkronizasyon takipçisi: Cloud güncellenemediğinde her 30sn'de bir dener (Fallback modu için)
 setInterval(() => {
-  if (isCloudDirty && inMemoryData) {
+  if (!isSupabaseEnabled && isCloudDirty && inMemoryData) {
     console.log('🔄 Arka plan retry: Cloud sync tekrar deneniyor...');
     syncToCloud(inMemoryData).catch(() => {});
   }
 }, 30000);
 
 // Geçmiş rezervasyonları temizle (Türkiye Saat Dilimi ile)
-function cleanupPastReservations() {
-  if (!inMemoryData) return false;
+async function cleanupPastReservations() {
   const today = getTurkeyDateStr();
+  if (isSupabaseEnabled) {
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/reservations?date=lt.${today}`;
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (res.ok) {
+        console.log(`🧹 Supabase geçmiş rezervasyonlar temizlendi (TR Bugün: ${today}).`);
+        inMemoryData = await fetchFromSupabase();
+      }
+    } catch (e) {
+      console.error('Supabase cleanupPastReservations error:', e.message);
+    }
+    return;
+  }
+
+  if (!inMemoryData) return false;
   let changed = false;
   for (const date of Object.keys(inMemoryData)) {
     if (date < today) {
@@ -141,7 +256,15 @@ function cleanupPastReservations() {
 }
 
 // GET all reservations
-app.get('/api/reservations', (req, res) => {
+app.get('/api/reservations', async (req, res) => {
+  if (isSupabaseEnabled) {
+    try {
+      inMemoryData = await fetchFromSupabase();
+      return res.json(inMemoryData);
+    } catch (e) {
+      console.error('Supabase GET /api/reservations error, using cache:', e.message);
+    }
+  }
   if (!inMemoryData) {
     inMemoryData = readLocalData();
   }
@@ -149,7 +272,14 @@ app.get('/api/reservations', (req, res) => {
 });
 
 // GET list of unique names (for easy tap-to-login)
-app.get('/api/members', (req, res) => {
+app.get('/api/members', async (req, res) => {
+  if (isSupabaseEnabled) {
+    try {
+      inMemoryData = await fetchFromSupabase();
+    } catch (e) {
+      console.error('Supabase GET /api/members fetch cache update failed:', e.message);
+    }
+  }
   const data = inMemoryData || readLocalData();
   const names = new Set();
   Object.values(data).forEach(r => {
@@ -178,7 +308,16 @@ app.post('/api/reservations', async (req, res) => {
 
   const cleanName = name.trim();
   const targetSlot = (slot === 'day' || slot === 'night') ? slot : 'full';
-  if (!inMemoryData) inMemoryData = readLocalData();
+
+  if (isSupabaseEnabled) {
+    try {
+      inMemoryData = await fetchFromSupabase();
+    } catch (e) {
+      console.warn('Supabase fetch failed before POST conflict check, using cache:', e.message);
+    }
+  } else {
+    if (!inMemoryData) inMemoryData = readLocalData();
+  }
 
   const existing = inMemoryData[date];
 
@@ -192,7 +331,6 @@ app.post('/api/reservations', async (req, res) => {
   };
 
   if (existing) {
-    // 1. Durum: Mevcut kayıt çift slotlu nesne ise ({ day: {...}, night: {...} })
     if (existing.day || existing.night) {
       if (targetSlot === 'full') {
         return res.status(409).json({ error: 'Bu günün saatleri zaten kısmen rezerve edilmiş. Tam gün alınamaz.' });
@@ -206,30 +344,25 @@ app.post('/api/reservations', async (req, res) => {
       }
       existing[targetSlot] = newRes;
     } else {
-      // 2. Durum: Mevcut kayıt tekil nesne ise ({ name, slot, ... })
       const existingSlot = getReservationSlot(existing);
       const isSameUser = existing.name.toLowerCase() === cleanName.toLowerCase() || (deviceId && existing.deviceId === deviceId);
 
       if (isSameUser) {
-        // Aynı kullanıcı/cihaz güncelliyor
         if (targetSlot === 'full') {
           inMemoryData[date] = newRes;
         } else if (existingSlot === targetSlot || existingSlot === 'full') {
           inMemoryData[date] = newRes;
         } else {
-          // Farklı slot eklendi (örneğin önceden day vardı, şimdi night ekliyor)
           inMemoryData[date] = {
             [existingSlot]: existing,
             [targetSlot]: newRes
           };
         }
       } else {
-        // Başka bir kullanıcı
         if (existingSlot === 'full' || targetSlot === 'full' || existingSlot === targetSlot) {
           const slotLabel = existingSlot === 'full' ? 'Tam Gün' : (existingSlot === 'day' ? 'Gündüz' : 'Akşam');
           return res.status(409).json({ error: `Bu tarih (${slotLabel}) zaten ${existing.name} tarafından rezerve edilmiş.` });
         } else {
-          // Çakışmayan slotlar (Biri day, diğeri night) -> İkisini de sakla!
           inMemoryData[date] = {
             [existingSlot]: existing,
             [targetSlot]: newRes
@@ -238,7 +371,6 @@ app.post('/api/reservations', async (req, res) => {
       }
     }
   } else {
-    // 3. Durum: Bu tarihte hiç kayıt yok
     if (targetSlot === 'full') {
       inMemoryData[date] = newRes;
     } else {
@@ -248,8 +380,18 @@ app.post('/api/reservations', async (req, res) => {
     }
   }
 
-  writeLocalData(inMemoryData);
-  syncToCloud(inMemoryData).catch(() => {});
+  if (isSupabaseEnabled) {
+    try {
+      await saveToSupabase(date, cleanName, note, targetSlot, deviceId, req.body.isGps);
+      inMemoryData = await fetchFromSupabase();
+    } catch (e) {
+      console.error('Supabase POST error:', e.message);
+      return res.status(500).json({ error: 'Veritabanı kayıt hatası oluştu.' });
+    }
+  } else {
+    writeLocalData(inMemoryData);
+    syncToCloud(inMemoryData).catch(() => {});
+  }
 
   res.json({ success: true, reservation: inMemoryData[date] });
 });
@@ -263,7 +405,15 @@ app.delete('/api/reservations/:date', async (req, res) => {
     return res.status(400).json({ error: 'İsim gerekli.' });
   }
 
-  if (!inMemoryData) inMemoryData = readLocalData();
+  if (isSupabaseEnabled) {
+    try {
+      inMemoryData = await fetchFromSupabase();
+    } catch (e) {
+      console.warn('Supabase fetch failed before DELETE check, using cache:', e.message);
+    }
+  } else {
+    if (!inMemoryData) inMemoryData = readLocalData();
+  }
 
   const existing = inMemoryData[date];
   if (!existing) {
@@ -272,7 +422,7 @@ app.delete('/api/reservations/:date', async (req, res) => {
 
   const targetSlot = (slot === 'day' || slot === 'night') ? slot : null;
 
-  // 1. Çift slotlu kayıt silme
+  // 1. Çift slotlu kayıt silme yetki kontrolü
   if (existing.day || existing.night) {
     if (targetSlot && existing[targetSlot]) {
       const item = existing[targetSlot];
@@ -282,13 +432,11 @@ app.delete('/api/reservations/:date', async (req, res) => {
         return res.status(403).json({ error: 'Sadece kendi rezervasyonunuzu iptal edebilirsiniz.' });
       }
       delete existing[targetSlot];
-      // Eğer tek slot kaldıysa onu tekil hale getir
       const remaining = existing.day ? 'day' : (existing.night ? 'night' : null);
       if (!remaining) {
         delete inMemoryData[date];
       }
     } else {
-      // Slot belirtilmediyse her iki slotu da yetki kontrolü ile dene
       let deletedCount = 0;
       ['day', 'night'].forEach(s => {
         if (existing[s]) {
@@ -309,7 +457,7 @@ app.delete('/api/reservations/:date', async (req, res) => {
       }
     }
   } else {
-    // 2. Tekil kayıt silme
+    // 2. Tekil kayıt silme yetki kontrolü
     const deviceMatch = deviceId && existing.deviceId && existing.deviceId === deviceId;
     const nameMatch = existing.name.toLowerCase() === name.trim().toLowerCase();
     if (!deviceMatch && !nameMatch) {
@@ -318,8 +466,18 @@ app.delete('/api/reservations/:date', async (req, res) => {
     delete inMemoryData[date];
   }
 
-  writeLocalData(inMemoryData);
-  syncToCloud(inMemoryData).catch(() => {});
+  if (isSupabaseEnabled) {
+    try {
+      await deleteFromSupabase(date, targetSlot);
+      inMemoryData = await fetchFromSupabase();
+    } catch (e) {
+      console.error('Supabase DELETE error:', e.message);
+      return res.status(500).json({ error: 'Veritabanı silme hatası oluştu.' });
+    }
+  } else {
+    writeLocalData(inMemoryData);
+    syncToCloud(inMemoryData).catch(() => {});
+  }
 
   res.json({ success: true });
 });
@@ -336,8 +494,7 @@ async function startServer() {
 
   // Her gün gece yarısı geçmiş rezervasyonları temizle
   setInterval(() => {
-    const cleaned = cleanupPastReservations();
-    if (cleaned) syncToCloud(inMemoryData).catch(() => {});
+    cleanupPastReservations();
   }, 24 * 60 * 60 * 1000);
 
   app.listen(PORT, () => {
