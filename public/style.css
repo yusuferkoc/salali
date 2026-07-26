@@ -1122,35 +1122,21 @@ html.has-user.name-changing #appContent {
 }
 
 /* ===== Tıklama ve Dokunma Animasyonları (Instant Tactile Feedback) ===== */
-button,
-.btn-hero,
-.modal-btn,
-.btn-primary,
-.member-chip,
-.reserve-type-tag,
-.btn-icon-round,
-.cal-day,
-.upcoming-card {
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-}
-
+button:active,
 .btn-hero:active,
 .modal-btn:active,
 .btn-primary:active,
-.btn-icon-round:active,
 .member-chip:active,
-.reserve-type-tag:active {
-  transform: scale(0.95) !important;
-  opacity: 0.85;
-  transition: transform 0.08s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.08s ease;
-}
-
+.reserve-type-tag:active,
 .cal-day:active,
 .upcoming-card:active {
-  transform: scale(0.97) !important;
-  opacity: 0.9;
-  transition: transform 0.08s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.08s ease;
+  opacity: 0.75 !important;
 }
+
+button, a, .cal-day, .upcoming-card, .member-chip {
+  -webkit-tap-highlight-color: transparent;
+}
+
+
 
 
