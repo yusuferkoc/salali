@@ -153,7 +153,7 @@ app.post('/api/reservations', async (req, res) => {
   };
 
   writeLocalData(inMemoryData);
-  await syncToCloud(inMemoryData);
+  syncToCloud(inMemoryData).catch(() => {});
 
   res.json({ success: true, reservation: inMemoryData[date] });
 });
@@ -184,7 +184,7 @@ app.delete('/api/reservations/:date', async (req, res) => {
 
   delete inMemoryData[date];
   writeLocalData(inMemoryData);
-  await syncToCloud(inMemoryData);
+  syncToCloud(inMemoryData).catch(() => {});
 
   res.json({ success: true });
 });

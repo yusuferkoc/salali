@@ -316,6 +316,14 @@ async function loadReservations(silent = false) {
 }
 
 async function makeReservation(dateStr, note) {
+  const btn = document.querySelector('#modalBody .modal-btn--reserve');
+  let originalHtml = '';
+  if (btn) {
+    originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    btn.innerHTML = '⏳ Kaydediliyor...';
+  }
   try {
     const res = await fetch('/api/reservations', {
       method: 'POST',
@@ -325,6 +333,7 @@ async function makeReservation(dateStr, note) {
     const data = await res.json();
     if (!res.ok) {
       showToast(data.error || 'İşlem başarısız.', 'error');
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerHTML = originalHtml; }
       return;
     }
     showToast('✅ Başarıyla eklendi!', 'success');
@@ -332,10 +341,19 @@ async function makeReservation(dateStr, note) {
     closeModal();
   } catch {
     showToast('Sunucuya erişilemiyor.', 'error');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerHTML = originalHtml; }
   }
 }
 
 async function cancelReservation(dateStr) {
+  const btn = document.querySelector('#modalBody .modal-btn--cancel') || document.querySelector('#heroAction .btn-hero--cancel');
+  let originalHtml = '';
+  if (btn) {
+    originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    btn.innerHTML = '⏳ İptal ediliyor...';
+  }
   try {
     const res = await fetch(`/api/reservations/${dateStr}`, {
       method: 'DELETE',
@@ -345,6 +363,7 @@ async function cancelReservation(dateStr) {
     const data = await res.json();
     if (!res.ok) {
       showToast(data.error || 'İptal edilemedi.', 'error');
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerHTML = originalHtml; }
       return;
     }
     showToast('🗑️ Rezervasyon iptal edildi.', 'success');
@@ -352,6 +371,7 @@ async function cancelReservation(dateStr) {
     closeModal();
   } catch {
     showToast('Sunucuya erişilemiyor.', 'error');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerHTML = originalHtml; }
   }
 }
 
@@ -402,13 +422,13 @@ function renderHero() {
     heroStatus.innerHTML = 'Boş';
     heroDetail.textContent = 'Ev şu an boş, müsait!';
     
-    // Bugün için iki ayrı buton: Buradayım (GPS) ve Geleceğim
+    // Bugün için iki ayrı buton: Buradayım (GPS) ve Gideceğim
     heroAction.innerHTML = `
       <button class="btn-hero btn-hero--reserve" onclick="heroReserveHere()" style="display:flex;align-items:center;justify-content:center;">
         <i data-lucide="map-pin" style="width:18px;margin-right:6px;"></i> Buradayım
       </button>
       <button class="btn-hero btn-hero--coming" onclick="heroReserveComing()" style="display:flex;align-items:center;justify-content:center;">
-        <i data-lucide="calendar-plus" style="width:18px;margin-right:6px;"></i> Geleceğim
+        <i data-lucide="calendar-plus" style="width:18px;margin-right:6px;"></i> Gideceğim
       </button>
     `;
   }
@@ -606,13 +626,13 @@ function openDayModal(dateStr, day, month, year, r) {
     html += `<div class="modal-status-badge s-free">🟢 Müsait</div>`;
 
     if (isToday) {
-      // Bugün: İlk adım — Buradayım ve Geleceğim seçenekleri
+      // Bugün: İlk adım — Buradayım ve Gideceğim seçenekleri
       html += `<div class="modal-choice-buttons">
         <button class="modal-btn modal-btn--reserve" onclick="openReserveStepModal('${dateStr}', ${day}, ${month}, ${year}, 'here')" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;">
           <i data-lucide="map-pin" style="width:18px;"></i> Buradayım (GPS)
         </button>
         <button class="modal-btn modal-btn--coming" onclick="openReserveStepModal('${dateStr}', ${day}, ${month}, ${year}, 'coming')" style="display:flex;align-items:center;justify-content:center;gap:6px;">
-          <i data-lucide="calendar-plus" style="width:18px;"></i> Geleceğim
+          <i data-lucide="calendar-plus" style="width:18px;"></i> Gideceğim
         </button>
       </div>`;
     } else {
@@ -621,7 +641,7 @@ function openDayModal(dateStr, day, month, year, r) {
       modalReserveMode = 'coming';
       html += buildKendimMisafirHtml();
       html += `<textarea class="modal-note-input" id="reserveNote" rows="2" placeholder="Not ekle (opsiyonel)..."></textarea>`;
-      html += `<button class="modal-btn modal-btn--reserve" onclick="onFinalReserve('${dateStr}')" style="display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="calendar-plus" style="width:18px;"></i> Geleceğim</button>`;
+      html += `<button class="modal-btn modal-btn--reserve" onclick="onFinalReserve('${dateStr}')" style="display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="calendar-plus" style="width:18px;"></i> Gideceğim</button>`;
     }
   }
 
@@ -648,7 +668,7 @@ function buildKendimMisafirHtml() {
   </div>`;
 }
 
-// Buradayım / Geleceğim tıklandıktan sonra Kendim/Misafir adımı
+// Buradayım / Gideceğim tıklandıktan sonra Kendim/Misafir adımı
 function openReserveStepModal(dateStr, day, month, year, mode) {
   modalReserveMode = mode;
   modalReserveType = 'self';
@@ -672,7 +692,7 @@ function openReserveStepModal(dateStr, day, month, year, mode) {
   if (mode === 'here') {
     html += `<div class="modal-status-badge s-mine">📍 Buradayım — GPS ile doğrulanacak</div>`;
   } else {
-    html += `<div class="modal-status-badge s-free">📅 Geleceğim</div>`;
+    html += `<div class="modal-status-badge s-free">📅 Gideceğim</div>`;
   }
 
   // Kendim / Misafir tag'ları
