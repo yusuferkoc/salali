@@ -241,8 +241,8 @@ function init() {
 
 // ========== Name Flow ==========
 async function showNameOverlay() {
-  // CSS !important override'ını devre dışı bırak
-  document.documentElement.classList.remove('has-user');
+  // CSS ile overlay'i göster
+  document.documentElement.classList.add('name-changing');
   nameOverlay.style.display = 'flex';
   appContent.style.display = 'none';
 
@@ -288,8 +288,9 @@ function onChangeName() {
 }
 
 function showApp() {
-  // CSS !important kuralını tekrar aktif et (flash önleme)
+  // CSS class'larını düzelt
   document.documentElement.classList.add('has-user');
+  document.documentElement.classList.remove('name-changing');
   nameOverlay.style.display = 'none';
   appContent.style.display = 'block';
   userNameEl.textContent = currentUser;
@@ -471,11 +472,15 @@ function renderUpcoming() {
     const w = weatherCache[dateStr];
     const weatherHtml = w ? `<span style="font-size:0.8rem;margin-left:auto;color:#fbbf24;">${w.icon} ${w.maxTemp}°C</span>` : '';
 
+    // Rezerve tarihi
+    const createdInfo = r.createdAt ? formatCreatedAt(r.createdAt) : '';
+
     card.innerHTML = `
       <span class="upcoming-dot ${dotClass}"></span>
       <div class="upcoming-info">
         <div class="upcoming-date">${d} ${AY[m - 1]} · ${dayName}</div>
         <div class="upcoming-name">${esc(r.name)}${r.note ? ' — ' + esc(r.note) : ''}</div>
+        ${createdInfo ? `<div class="upcoming-created">📌 ${createdInfo}</div>` : ''}
       </div>
       ${weatherHtml}
     `;
@@ -595,6 +600,7 @@ function openDayModal(dateStr, day, month, year, r) {
     html += `<div class="modal-status-badge ${cls}">${icon} ${label}</div>`;
     html += `<div class="modal-info"><strong>Kim:</strong> ${esc(r.name)}</div>`;
     if (r.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.note)}</div>`;
+    if (r.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.createdAt)}</div>`;
     if (isMine) html += `<button class="modal-btn modal-btn--cancel" onclick="cancelReservation('${dateStr}')" style="display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="x-circle" style="width:18px;"></i> İptal Et</button>`;
   } else {
     html += `<div class="modal-status-badge s-free">🟢 Müsait</div>`;
@@ -723,6 +729,20 @@ async function onFinalReserve(dateStr) {
 // ========== Helpers ==========
 function fmtDate(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function formatCreatedAt(isoStr) {
+  try {
+    const dt = new Date(isoStr);
+    const d = dt.getDate();
+    const m = AY[dt.getMonth()];
+    const y = dt.getFullYear();
+    const h = String(dt.getHours()).padStart(2, '0');
+    const min = String(dt.getMinutes()).padStart(2, '0');
+    return `${d} ${m} ${y}, ${h}:${min}`;
+  } catch {
+    return '';
+  }
 }
 
 function esc(s) {

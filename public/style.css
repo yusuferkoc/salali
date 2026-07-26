@@ -466,6 +466,12 @@ body {
   color: var(--text-dim);
 }
 
+.upcoming-created {
+  font-size: 0.7rem;
+  color: var(--green);
+  margin-top: 2px;
+}
+
 .upcoming-empty {
   text-align: center;
   padding: 20px;
@@ -818,10 +824,17 @@ body {
 
 /* ===== Instant Load (Prevent Flash) ===== */
 html.has-user #nameOverlay {
-  display: none !important;
+  display: none;
 }
 html.has-user #appContent {
-  display: block !important;
+  display: block;
+}
+/* İsim değiştirme sırasında overlay'i göster */
+html.has-user.name-changing #nameOverlay {
+  display: flex;
+}
+html.has-user.name-changing #appContent {
+  display: none;
 }
 
 /* ===== Quick Members Chips ===== */
