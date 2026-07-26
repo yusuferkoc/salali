@@ -642,7 +642,7 @@ async function onFinalReserve(dateStr) {
       note = note ? `Misafir için · ${note}` : 'Misafir için';
     }
 
-    makeReservation(dateStr, note);
+    await makeReservation(dateStr, note);
   } catch (msg) {
     showToast(msg, 'error');
   }
