@@ -361,6 +361,50 @@ body {
   border-color: rgba(245, 158, 11, 0.4);
 }
 
+/* GPS Doğrulandı Rozetleri */
+.hero-gps-badge {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--green);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  white-space: nowrap;
+  z-index: 5;
+  letter-spacing: 0.05em;
+  animation: pulse-gps 2s infinite;
+}
+
+@keyframes pulse-gps {
+  0% { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 4px 20px rgba(16, 185, 129, 0.7); }
+  100% { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); }
+}
+
+.gps-badge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-top: 6px;
+  margin-bottom: 12px;
+  gap: 5px;
+}
+
 .hero-detail {
   font-size: 0.9rem;
   color: var(--text-dim);
