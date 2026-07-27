@@ -493,12 +493,12 @@ function renderHero() {
       
       if (isMine) {
         heroStatus.className = 'hero-status status-mine';
-        heroStatus.innerHTML = `🏔️${activeRes.isGps ? `<span class="hero-gps-badge">📍 GPS (${formatGpsTime(activeRes.createdAt)})</span>` : ''}`;
+        heroStatus.innerHTML = `🏔️${activeRes.isGps ? '<span class="hero-gps-badge">📍 GPS</span>' : ''}`;
         heroDetail.innerHTML = `Şu an <strong>sen</strong> oradasın (${slotLabel})`;
         heroAction.innerHTML = `<button class="btn-hero btn-hero--cancel" onclick="cancelReservation('${todayStr}', '${activeRes.slot || 'full'}')" style="display:flex;align-items:center;justify-content:center;"><i data-lucide="x-circle" style="width:18px;margin-right:6px;"></i> İptal Et</button>`;
       } else {
         heroStatus.className = 'hero-status status-occupied';
-        heroStatus.innerHTML = `Dolu${activeRes.isGps ? `<span class="hero-gps-badge">📍 GPS (${formatGpsTime(activeRes.createdAt)})</span>` : ''}`;
+        heroStatus.innerHTML = `Dolu${activeRes.isGps ? '<span class="hero-gps-badge">📍 GPS</span>' : ''}`;
         heroDetail.innerHTML = `<strong>${esc(resName)}</strong> şu an orada (${slotLabel})${resNote ? ' (' + esc(resNote) + ')' : ''}`;
         
         const avail = getSlotAvailability(todayStr);
