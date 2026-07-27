@@ -185,7 +185,7 @@ function getWeatherInfo(code) {
 
 async function loadWeather() {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${EV_LAT}&longitude=${EV_LNG}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${EV_LAT}&longitude=${EV_LNG}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`;
     const res = await fetch(url);
     if (!res.ok) return;
     const data = await res.json();
@@ -193,11 +193,13 @@ async function loadWeather() {
       data.daily.time.forEach((dateStr, i) => {
         const code = data.daily.weather_code[i];
         const info = getWeatherInfo(code);
+        const rainProb = data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[i] : null;
         weatherCache[dateStr] = {
           icon: info.icon,
           text: info.text,
           maxTemp: Math.round(data.daily.temperature_2m_max[i]),
-          minTemp: Math.round(data.daily.temperature_2m_min[i])
+          minTemp: Math.round(data.daily.temperature_2m_min[i]),
+          rainProb: rainProb
         };
       });
       render();
@@ -455,7 +457,8 @@ function renderHero() {
     const tw = weatherCache[todayStr];
     if (tw) {
       heroWeather.style.display = 'inline-flex';
-      heroWeather.innerHTML = `<span class="hero-weather-icon">${tw.icon}</span> <span>${tw.text}</span> <span class="hero-weather-temp">${tw.maxTemp}° / ${tw.minTemp}°C</span>`;
+      const rainHtml = tw.rainProb !== null ? ` <span class="hero-weather-rain" style="margin-left:6px;opacity:0.85;">☔ %${tw.rainProb}</span>` : '';
+      heroWeather.innerHTML = `<span class="hero-weather-icon">${tw.icon}</span> <span>${tw.text}${rainHtml}</span> <span class="hero-weather-temp">${tw.maxTemp}° / ${tw.minTemp}°C</span>`;
     } else {
       heroWeather.style.display = 'none';
     }
@@ -555,7 +558,8 @@ function renderUpcoming() {
 
     // Hava durumu ekle
     const w = weatherCache[dateStr];
-    const weatherHtml = w ? `<span style="font-size:0.8rem;margin-left:auto;color:#fbbf24;">${w.icon} ${w.maxTemp}°C</span>` : '';
+    const rainText = (w && w.rainProb !== null && w.rainProb > 0) ? ` <span style="font-size:0.75rem;opacity:0.8;color:#93c5fd;">☔%${w.rainProb}</span>` : '';
+    const weatherHtml = w ? `<span style="font-size:0.8rem;margin-left:auto;color:#fbbf24;display:flex;align-items:center;gap:4px;">${w.icon} ${w.maxTemp}°C${rainText}</span>` : '';
 
     // Rezerve tarihi
     const createdInfo = createdDate ? formatCreatedAt(createdDate) : '';
@@ -644,7 +648,8 @@ function renderCalendar() {
 
     // Hava durumu simgesi (takvim hücresi)
     const w = weatherCache[dateStr];
-    const weatherBadge = w ? `<span class="cal-weather" title="${w.text}: ${w.maxTemp}° / ${w.minTemp}°C">${w.icon}${w.maxTemp}°</span>` : '';
+    const rainText = (w && w.rainProb !== null) ? ` (Yağış: %${w.rainProb})` : '';
+    const weatherBadge = w ? `<span class="cal-weather" title="${w.text}: ${w.maxTemp}° / ${w.minTemp}°C${rainText}">${w.icon}${w.maxTemp}°</span>` : '';
 
     el.innerHTML = `
       <span class="cal-day-num">${d}</span>
@@ -725,9 +730,10 @@ function openDayModal(dateStr, day, month, year, r) {
   // Modal Hava Durumu Kartı
   const w = weatherCache[dateStr];
   if (w) {
+    const rainHtml = w.rainProb !== null ? `<span style="font-size:0.8rem;color:rgba(255,255,255,0.7);margin-left:8px;background:rgba(59,130,246,0.2);padding:2px 6px;border-radius:4px;">☔ Yağış: %${w.rainProb}</span>` : '';
     html += `<div class="modal-weather-badge">
       <span>${w.icon}</span>
-      <span>${w.text}</span>
+      <span>${w.text}${rainHtml}</span>
       <span style="margin-left:auto;font-weight:600;">${w.maxTemp}° / ${w.minTemp}°C</span>
     </div>`;
   }
