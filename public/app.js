@@ -59,8 +59,8 @@ function getReservationName(r) {
   if (!r) return '';
   if (r.name) return r.name;
   const names = [];
-  if (r.day && r.day.name) names.push(`☀️ ${r.day.name}`);
-  if (r.night && r.night.name) names.push(`🌙 ${r.night.name}`);
+  if (r.day && r.day.name) names.push(`Gündüz: ${r.day.name}`);
+  if (r.night && r.night.name) names.push(`Akşam: ${r.night.name}`);
   return names.join(' / ');
 }
 
@@ -85,8 +85,8 @@ function getReservationNote(r) {
   if (!r) return '';
   if (r.note) return r.note;
   const notes = [];
-  if (r.day && r.day.note) notes.push(`☀️ ${r.day.note}`);
-  if (r.night && r.night.note) notes.push(`🌙 ${r.night.note}`);
+  if (r.day && r.day.note) notes.push(`Gündüz: ${r.day.note}`);
+  if (r.night && r.night.note) notes.push(`Akşam: ${r.night.note}`);
   return notes.join(' | ');
 }
 
@@ -674,7 +674,7 @@ function renderCalendar() {
         const dayNameText = r.day ? r.day.name : '';
         const nightNameText = r.night ? r.night.name : '';
         const combined = [dayNameText, nightNameText].filter(Boolean).join('/');
-        dayLabelHtml = `<div class="cal-day-slots"><span class="cal-slot-dot">☀️</span><span class="cal-slot-dot">🌙</span></div><span class="cal-day-name">${esc(combined)}</span>`;
+        dayLabelHtml = `<span class="cal-day-name">${esc(combined)}</span>`;
       } else {
         // Tekil slotlu gün
         const isMine = r.name.toLowerCase() === currentUser.toLowerCase();
@@ -683,8 +683,7 @@ function renderCalendar() {
         else if (isMine) cls += ' cal-day--mine';
         else cls += ' cal-day--occupied';
 
-        const prefix = r.slot === 'day' ? '☀️ ' : (r.slot === 'night' ? '🌙 ' : '');
-        dayLabelHtml = `<span class="cal-day-name">${prefix}${esc(r.name)}</span>`;
+        dayLabelHtml = `<span class="cal-day-name">${esc(r.name)}</span>`;
       }
     } else if (!isPast) {
       cls += ' cal-day--free';
@@ -790,7 +789,7 @@ function openDayModal(dateStr, day, month, year, r) {
     if (r.day || r.night) {
       if (r.day) {
         const isMine = r.day.name.toLowerCase() === currentUser.toLowerCase();
-        html += `<div class="modal-status-badge ${isMine ? 's-mine' : 's-occupied'}">☀️ Gündüz (Piknik) — ${esc(r.day.name)}</div>`;
+        html += `<div class="modal-status-badge ${isMine ? 's-mine' : 's-occupied'}">Gündüz (Piknik) — ${esc(r.day.name)}</div>`;
         if (r.day.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.day.note)}</div>`;
         if (r.day.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.day.createdAt)}</div>`;
         if (r.day.isGps) html += `<div class="gps-badge"><i data-lucide="map-pin" style="width:14px;height:14px;"></i> GPS ile Salarlı'dan doğrulandı (${formatGpsTime(r.day.createdAt)})</div>`;
@@ -798,7 +797,7 @@ function openDayModal(dateStr, day, month, year, r) {
       }
       if (r.night) {
         const isMine = r.night.name.toLowerCase() === currentUser.toLowerCase();
-        html += `<div class="modal-status-badge ${isMine ? 's-mine' : 's-occupied'}">🌙 Akşam & Gece — ${esc(r.night.name)}</div>`;
+        html += `<div class="modal-status-badge ${isMine ? 's-mine' : 's-occupied'}">Akşam & Gece — ${esc(r.night.name)}</div>`;
         if (r.night.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.night.note)}</div>`;
         if (r.night.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.night.createdAt)}</div>`;
         if (r.night.isGps) html += `<div class="gps-badge"><i data-lucide="map-pin" style="width:14px;height:14px;"></i> GPS ile Salarlı'dan doğrulandı (${formatGpsTime(r.night.createdAt)})</div>`;
@@ -809,7 +808,7 @@ function openDayModal(dateStr, day, month, year, r) {
         modalReserveType = 'self';
         modalReserveMode = 'coming';
         modalSlot = 'day';
-        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--green);">☀️ Gündüz saatleri boş!</div>`;
+        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--green);">Gündüz saatleri boş!</div>`;
         html += buildSlotSelectHtml({ full: false, day: true, night: false });
         html += buildKendimMisafirHtml();
         html += `<textarea class="modal-note-input" id="reserveNote" rows="2" placeholder="Not ekle (opsiyonel)..."></textarea>`;
@@ -818,7 +817,7 @@ function openDayModal(dateStr, day, month, year, r) {
         modalReserveType = 'self';
         modalReserveMode = 'coming';
         modalSlot = 'night';
-        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--blue);">🌙 Akşam saatleri boş!</div>`;
+        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--blue);">Akşam saatleri boş!</div>`;
         html += buildSlotSelectHtml({ full: false, day: false, night: true });
         html += buildKendimMisafirHtml();
         html += `<textarea class="modal-note-input" id="reserveNote" rows="2" placeholder="Not ekle (opsiyonel)..."></textarea>`;
@@ -829,7 +828,7 @@ function openDayModal(dateStr, day, month, year, r) {
       const isMine = r.name.toLowerCase() === currentUser.toLowerCase();
       const cls = isMine ? 's-mine' : 's-occupied';
       const icon = isMine ? '🔵' : '🔴';
-      const slotName = r.slot === 'day' ? '☀️ Gündüz (Piknik)' : (r.slot === 'night' ? '🌙 Akşam & Gece' : '🏡 Tam Gün');
+      const slotName = r.slot === 'day' ? 'Gündüz (Piknik)' : (r.slot === 'night' ? 'Akşam & Gece' : 'Tam Gün');
 
       html += `<div class="modal-status-badge ${cls}">${icon} ${slotName} — ${esc(r.name)}</div>`;
       if (r.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.note)}</div>`;
@@ -842,7 +841,7 @@ function openDayModal(dateStr, day, month, year, r) {
         modalReserveType = 'self';
         modalReserveMode = 'coming';
         modalSlot = 'night';
-        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--blue);">🌙 Akşam & Gece saati boş!</div>`;
+        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--blue);">Akşam & Gece saati boş!</div>`;
         html += buildSlotSelectHtml({ full: false, day: false, night: true });
         html += buildKendimMisafirHtml();
         html += `<textarea class="modal-note-input" id="reserveNote" rows="2" placeholder="Not ekle (opsiyonel)..."></textarea>`;
@@ -851,7 +850,7 @@ function openDayModal(dateStr, day, month, year, r) {
         modalReserveType = 'self';
         modalReserveMode = 'coming';
         modalSlot = 'day';
-        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--green);">☀️ Gündüz saati boş!</div>`;
+        html += `<div style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--green);">Gündüz saati boş!</div>`;
         html += buildSlotSelectHtml({ full: false, day: true, night: false });
         html += buildKendimMisafirHtml();
         html += `<textarea class="modal-note-input" id="reserveNote" rows="2" placeholder="Not ekle (opsiyonel)..."></textarea>`;
