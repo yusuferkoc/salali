@@ -493,12 +493,12 @@ function renderHero() {
       
       if (isMine) {
         heroStatus.className = 'hero-status status-mine';
-        heroStatus.innerHTML = `🏔️${activeRes.isGps ? '<span class="hero-gps-badge">📍 GPS</span>' : ''}`;
+        heroStatus.innerHTML = `🏔️${activeRes.isGps ? `<span class="hero-gps-badge">📍 GPS (${formatGpsTime(activeRes.createdAt)})</span>` : ''}`;
         heroDetail.innerHTML = `Şu an <strong>sen</strong> oradasın (${slotLabel})`;
         heroAction.innerHTML = `<button class="btn-hero btn-hero--cancel" onclick="cancelReservation('${todayStr}', '${activeRes.slot || 'full'}')" style="display:flex;align-items:center;justify-content:center;"><i data-lucide="x-circle" style="width:18px;margin-right:6px;"></i> İptal Et</button>`;
       } else {
         heroStatus.className = 'hero-status status-occupied';
-        heroStatus.innerHTML = `Dolu${activeRes.isGps ? '<span class="hero-gps-badge">📍 GPS</span>' : ''}`;
+        heroStatus.innerHTML = `Dolu${activeRes.isGps ? `<span class="hero-gps-badge">📍 GPS (${formatGpsTime(activeRes.createdAt)})</span>` : ''}`;
         heroDetail.innerHTML = `<strong>${esc(resName)}</strong> şu an orada (${slotLabel})${resNote ? ' (' + esc(resNote) + ')' : ''}`;
         
         const avail = getSlotAvailability(todayStr);
@@ -793,7 +793,7 @@ function openDayModal(dateStr, day, month, year, r) {
         html += `<div class="modal-status-badge ${isMine ? 's-mine' : 's-occupied'}">☀️ Gündüz (Piknik) — ${esc(r.day.name)}</div>`;
         if (r.day.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.day.note)}</div>`;
         if (r.day.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.day.createdAt)}</div>`;
-        if (r.day.isGps) html += `<div class="gps-badge"><i data-lucide="map-pin" style="width:14px;height:14px;"></i> GPS ile Salarlı'dan doğrulandı</div>`;
+        if (r.day.isGps) html += `<div class="gps-badge"><i data-lucide="map-pin" style="width:14px;height:14px;"></i> GPS ile Salarlı'dan doğrulandı (${formatGpsTime(r.day.createdAt)})</div>`;
         if (isMine) html += `<button class="modal-btn modal-btn--cancel" onclick="cancelReservation('${dateStr}', 'day')" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;"><i data-lucide="x-circle" style="width:18px;"></i> Gündüzü İptal Et</button>`;
       }
       if (r.night) {
@@ -801,7 +801,7 @@ function openDayModal(dateStr, day, month, year, r) {
         html += `<div class="modal-status-badge ${isMine ? 's-mine' : 's-occupied'}">🌙 Akşam & Gece — ${esc(r.night.name)}</div>`;
         if (r.night.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.night.note)}</div>`;
         if (r.night.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.night.createdAt)}</div>`;
-        if (r.night.isGps) html += `<div class="gps-badge"><i data-lucide="map-pin" style="width:14px;height:14px;"></i> GPS ile Salarlı'dan doğrulandı</div>`;
+        if (r.night.isGps) html += `<div class="gps-badge"><i data-lucide="map-pin" style="width:14px;height:14px;"></i> GPS ile Salarlı'dan doğrulandı (${formatGpsTime(r.night.createdAt)})</div>`;
         if (isMine) html += `<button class="modal-btn modal-btn--cancel" onclick="cancelReservation('${dateStr}', 'night')" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;"><i data-lucide="x-circle" style="width:18px;"></i> Akşamı İptal Et</button>`;
       }
       // Boş kalan slot varsa rezervasyon butonu göster
@@ -834,7 +834,7 @@ function openDayModal(dateStr, day, month, year, r) {
       html += `<div class="modal-status-badge ${cls}">${icon} ${slotName} — ${esc(r.name)}</div>`;
       if (r.note) html += `<div class="modal-info"><strong>Not:</strong> ${esc(r.note)}</div>`;
       if (r.createdAt) html += `<div class="modal-info"><strong>Rezerve tarihi:</strong> ${formatCreatedAt(r.createdAt)}</div>`;
-      if (r.isGps) html += `<div class="gps-badge"><i data-lucide="map-pin" style="width:14px;height:14px;"></i> GPS ile Salarlı'dan doğrulandı</div>`;
+      if (r.isGps) html += `<div class="gps-badge"><i data-lucide="map-pin" style="width:14px;height:14px;"></i> GPS ile Salarlı'dan doğrulandı (${formatGpsTime(r.createdAt)})</div>`;
       if (isMine) html += `<button class="modal-btn modal-btn--cancel" onclick="cancelReservation('${dateStr}', '${r.slot || 'full'}')" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;"><i data-lucide="x-circle" style="width:18px;"></i> İptal Et</button>`;
 
       // Tekil slot day ise night boş; night ise day boş
@@ -1025,6 +1025,17 @@ function formatCreatedAt(isoStr) {
     const h = String(dt.getHours()).padStart(2, '0');
     const min = String(dt.getMinutes()).padStart(2, '0');
     return `${d} ${m} ${y}, ${h}:${min}`;
+  } catch {
+    return '';
+  }
+}
+
+function formatGpsTime(isoStr) {
+  try {
+    const dt = new Date(isoStr);
+    const h = String(dt.getHours()).padStart(2, '0');
+    const min = String(dt.getMinutes()).padStart(2, '0');
+    return `${h}:${min}`;
   } catch {
     return '';
   }
