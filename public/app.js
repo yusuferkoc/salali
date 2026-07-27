@@ -465,28 +465,75 @@ function renderHero() {
   }
 
   const r = reservations[todayStr];
+  const currentHour = now.getHours();
+  const isNightTime = currentHour >= 17; // 17:00'den sonrası Akşam/Gece sayılır
 
   if (r) {
-    const isMine = isReservationMine(r, currentUser);
-    const resName = getReservationName(r);
-    const resNote = getReservationNote(r);
-    if (isMine) {
-      heroStatus.className = 'hero-status status-mine';
-      heroStatus.innerHTML = '🏔️';
-      heroDetail.innerHTML = 'Şu an <strong>sen</strong> oradasın';
-      heroAction.innerHTML = `<button class="btn-hero btn-hero--cancel" onclick="cancelTodayReservation()" style="display:flex;align-items:center;justify-content:center;"><i data-lucide="x-circle" style="width:18px;margin-right:6px;"></i> İptal Et</button>`;
+    let dayRes = null;
+    let nightRes = null;
+    let fullRes = null;
+
+    if (r.day || r.night) {
+      dayRes = r.day;
+      nightRes = r.night;
     } else {
-      heroStatus.className = 'hero-status status-occupied';
-      heroStatus.innerHTML = 'Dolu';
-      heroDetail.innerHTML = `<strong>${esc(resName)}</strong> şu an orada${resNote ? ' (' + esc(resNote) + ')' : ''}`;
-      heroAction.innerHTML = '';
+      if (r.slot === 'day') dayRes = r;
+      else if (r.slot === 'night') nightRes = r;
+      else fullRes = r;
+    }
+
+    const activeRes = isNightTime ? (nightRes || fullRes) : (dayRes || fullRes);
+    const otherRes = isNightTime ? null : (nightRes || fullRes);
+
+    if (activeRes) {
+      const isMine = isReservationMine(activeRes, currentUser);
+      const resName = activeRes.name;
+      const resNote = activeRes.note;
+      const slotLabel = (activeRes.slot === 'day') ? 'Gündüz' : ((activeRes.slot === 'night') ? 'Akşam' : 'Tam Gün');
+      
+      if (isMine) {
+        heroStatus.className = 'hero-status status-mine';
+        heroStatus.innerHTML = '🏔️';
+        heroDetail.innerHTML = `Şu an <strong>sen</strong> oradasın (${slotLabel})`;
+        heroAction.innerHTML = `<button class="btn-hero btn-hero--cancel" onclick="cancelReservation('${todayStr}', '${activeRes.slot || 'full'}')" style="display:flex;align-items:center;justify-content:center;"><i data-lucide="x-circle" style="width:18px;margin-right:6px;"></i> İptal Et</button>`;
+      } else {
+        heroStatus.className = 'hero-status status-occupied';
+        heroStatus.innerHTML = 'Dolu';
+        heroDetail.innerHTML = `<strong>${esc(resName)}</strong> şu an orada (${slotLabel})${resNote ? ' (' + esc(resNote) + ')' : ''}`;
+        
+        const avail = getSlotAvailability(todayStr);
+        if (avail.day || avail.night) {
+          heroAction.innerHTML = `
+            <button class="btn-hero btn-hero--coming" onclick="heroReserveComing()" style="display:flex;align-items:center;justify-content:center;">
+              <i data-lucide="calendar-plus" style="width:18px;margin-right:6px;"></i> Boş Saati Rezerve Et
+            </button>
+          `;
+        } else {
+          heroAction.innerHTML = '';
+        }
+      }
+    } else {
+      // Şu anki saat dilimi boş ama günün diğer kısmı dolu
+      heroStatus.className = 'hero-status status-split';
+      heroStatus.innerHTML = 'Müsait';
+      
+      const otherLabel = otherRes ? `ancak akşam <strong>${esc(otherRes.name)}</strong> gelecek.` : '';
+      heroDetail.innerHTML = `Şu an ev boş/müsait, ${otherLabel}`;
+      
+      heroAction.innerHTML = `
+        <button class="btn-hero btn-hero--reserve" onclick="heroReserveHere()" style="display:flex;align-items:center;justify-content:center;">
+          <i data-lucide="map-pin" style="width:18px;margin-right:6px;"></i> Buradayım
+        </button>
+        <button class="btn-hero btn-hero--coming" onclick="heroReserveComing()" style="display:flex;align-items:center;justify-content:center;">
+          <i data-lucide="calendar-plus" style="width:18px;margin-right:6px;"></i> Gideceğim
+        </button>
+      `;
     }
   } else {
     heroStatus.className = 'hero-status status-free';
     heroStatus.innerHTML = 'Boş';
     heroDetail.textContent = 'Ev şu an boş, müsait!';
     
-    // Bugün için iki ayrı buton: Buradayım (GPS) ve Gideceğim
     heroAction.innerHTML = `
       <button class="btn-hero btn-hero--reserve" onclick="heroReserveHere()" style="display:flex;align-items:center;justify-content:center;">
         <i data-lucide="map-pin" style="width:18px;margin-right:6px;"></i> Buradayım
@@ -843,6 +890,36 @@ function openDayModal(dateStr, day, month, year, r) {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+function getSlotAvailability(dateStr) {
+  const r = reservations[dateStr];
+  if (!r) {
+    return { full: true, day: true, night: true };
+  }
+  
+  let dayRes = null;
+  let nightRes = null;
+  let fullRes = null;
+
+  if (r.day || r.night) {
+    dayRes = r.day;
+    nightRes = r.night;
+  } else {
+    if (r.slot === 'day') dayRes = r;
+    else if (r.slot === 'night') nightRes = r;
+    else fullRes = r;
+  }
+
+  if (fullRes) {
+    return { full: false, day: false, night: false };
+  }
+
+  return {
+    full: !dayRes && !nightRes,
+    day: !dayRes,
+    night: !nightRes
+  };
+}
+
 // Buradayım / Gideceğim tıklandıktan sonra Kendim/Misafir adımı
 function openReserveStepModal(dateStr, day, month, year, mode) {
   modalReserveMode = mode;
@@ -856,9 +933,10 @@ function openReserveStepModal(dateStr, day, month, year, mode) {
   // Hava durumu
   const w = weatherCache[dateStr];
   if (w) {
+    const rainHtml = w.rainProb !== null ? `<span style="font-size:0.8rem;color:rgba(255,255,255,0.7);margin-left:8px;background:rgba(59,130,246,0.2);padding:2px 6px;border-radius:4px;">☔ Yağış: %${w.rainProb}</span>` : '';
     html += `<div class="modal-weather-badge">
       <span>${w.icon}</span>
-      <span>${w.text}</span>
+      <span>${w.text}${rainHtml}</span>
       <span style="margin-left:auto;font-weight:600;">${w.maxTemp}° / ${w.minTemp}°C</span>
     </div>`;
   }
@@ -871,7 +949,8 @@ function openReserveStepModal(dateStr, day, month, year, mode) {
   }
 
   // Slot seçimi (Tam Gün / Gündüz / Akşam)
-  html += buildSlotSelectHtml({ full: true, day: true, night: true });
+  const avail = getSlotAvailability(dateStr);
+  html += buildSlotSelectHtml(avail);
 
   // Kendim / Misafir tag'ları
   html += buildKendimMisafirHtml();
