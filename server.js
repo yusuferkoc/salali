@@ -258,6 +258,11 @@ async function cleanupPastReservations() {
   return changed;
 }
 
+// stats route to serve stats.html
+app.get('/stats', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'stats.html'));
+});
+
 // GET all reservations
 app.get('/api/reservations', async (req, res) => {
   if (isSupabaseEnabled) {

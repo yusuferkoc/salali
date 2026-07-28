@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Salarlı · İstatistikler</title>
+  <meta name="description" content="Salarlı dağ evi rezervasyon istatistikleri ve analizleri">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="preload" as="image" href="DSC_0080.JPG">
+  <style>
+    /* ===== Reset & Variables ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --font: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --green: #34d399;
+      --green-soft: rgba(52, 211, 153, 0.15);
+      --red: #f87171;
+      --red-soft: rgba(248, 113, 113, 0.15);
+      --blue: #60a5fa;
+      --blue-soft: rgba(96, 165, 250, 0.15);
+      --purple: #a78bfa;
+      --purple-soft: rgba(167, 139, 250, 0.15);
+      --glass: rgba(15, 15, 20, 0.6);
+      --glass-heavy: rgba(10, 10, 15, 0.85);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-border-hover: rgba(255, 255, 255, 0.15);
+      --text: #f0f0f5;
+      --text-dim: rgba(240, 240, 245, 0.55);
+      --text-muted: rgba(240, 240, 245, 0.35);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body {
+      font-family: var(--font);
+      color: var(--text);
+      min-height: 100dvh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      background: #05050a;
+    }
+
+    /* ===== Background ===== */
+    .bg-photo {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      background: url('DSC_0080.JPG') center / cover no-repeat;
+      filter: blur(1px) brightness(0.7) saturate(1.1);
+      transform: scale(1.02);
+    }
+    .bg-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: linear-gradient(
+        180deg,
+        rgba(10, 10, 15, 0.25) 0%,
+        rgba(10, 10, 15, 0.5) 50%,
+        rgba(10, 10, 15, 0.75) 100%
+      );
+    }
+
+    /* ===== Layout Container ===== */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 30px 20px 80px 20px;
+    }
+
+    /* ===== Header ===== */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+    .logo-section h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 40%, var(--green) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .logo-section p {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+    .btn-back {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      color: var(--text);
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.3s var(--ease);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .btn-back:hover {
+      border-color: var(--glass-border-hover);
+      background: rgba(255, 255, 255, 0.05);
+      transform: translateY(-2px);
+    }
+
+    /* ===== Metric Grid ===== */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .metric-card {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s var(--ease);
+    }
+    .metric-card:hover {
+      border-color: var(--glass-border-hover);
+    }
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--green);
+    }
+    .metric-card.m-total::before { background: var(--green); }
+    .metric-card.m-popular::before { background: var(--purple); }
+    .metric-card.m-occupant::before { background: var(--blue); }
+    .metric-card.m-ratio::before { background: #f59e0b; }
+
+    .metric-label {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .metric-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-top: 8px;
+      color: #fff;
+    }
+    .metric-sub {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ===== Dashboard Grid ===== */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    @media (max-width: 900px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .dashboard-card {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 24px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .dashboard-card h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 12px;
+    }
+
+    /* ===== Charts & Containers ===== */
+    .chart-container {
+      position: relative;
+      width: 100%;
+      min-height: 280px;
+    }
+
+    /* ===== Table / Logs Section ===== */
+    .logs-card {
+      background: var(--glass-heavy);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 12px;
+    }
+    .search-input {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--glass-border);
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      outline: none;
+      transition: all 0.3s var(--ease);
+      width: 220px;
+    }
+    .search-input:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 10px rgba(52, 211, 153, 0.2);
+    }
+
+    .table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    th, td {
+      padding: 12px 16px;
+      font-size: 0.9rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    th {
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Status Pill / Badges */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      gap: 4px;
+    }
+    .status-badge.s-full { background: var(--green-soft); color: var(--green); }
+    .status-badge.s-day { background: var(--purple-soft); color: var(--purple); }
+    .status-badge.s-night { background: var(--blue-soft); color: var(--blue); }
+
+    .gps-tag {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    /* ===== Empty State ===== */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--text-dim);
+    }
+    .empty-state i {
+      font-size: 3rem;
+      margin-bottom: 16px;
+      color: var(--text-muted);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.1);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--glass-border-hover);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-photo"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="container">
+    <header>
+      <div class="logo-section">
+        <h1>Salarlı İstatistikleri</h1>
+        <p>Dağ evi kullanım, doluluk ve üye analizleri</p>
+      </div>
+      <a href="/" class="btn-back">
+        <i data-lucide="arrow-left" style="width: 18px;"></i>
+        Takvime Dön
+      </a>
+    </header>
+
+    <!-- Metrics Summary -->
+    <div class="metric-grid">
+      <div class="metric-card m-total">
+        <div class="metric-label">Toplam Rezervasyon</div>
+        <div class="metric-value" id="valTotal">0</div>
+        <div class="metric-sub">Kayıtlı toplam gün sayısı</div>
+      </div>
+      <div class="metric-card m-popular">
+        <div class="metric-label">En Çok Giden</div>
+        <div class="metric-value" id="valPopular">-</div>
+        <div class="metric-sub" id="valPopularSub">0 rezervasyon ile</div>
+      </div>
+      <div class="metric-card m-occupant">
+        <div class="metric-label">En Popüler Gün</div>
+        <div class="metric-value" id="valDay">-</div>
+        <div class="metric-sub" id="valDaySub">Haftanın en yoğun günü</div>
+      </div>
+      <div class="metric-card m-ratio">
+        <div class="metric-label">Slot Tercihi</div>
+        <div class="metric-value" id="valSlot">-</div>
+        <div class="metric-sub">En çok tercih edilen dilim</div>
+      </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div id="dashboardContent" class="dashboard-grid">
+      <!-- Top Visitors -->
+      <div class="dashboard-card">
+        <h3><i data-lucide="users" style="color: var(--green); width: 20px;"></i> En Çok Ziyaret Edenler</h3>
+        <div class="chart-container">
+          <canvas id="chartVisitors"></canvas>
+        </div>
+      </div>
+
+      <!-- Slot distribution -->
+      <div class="dashboard-card">
+        <h3><i data-lucide="pie-chart" style="color: var(--blue); width: 20px;"></i> Slot Dağılımı</h3>
+        <div class="chart-container">
+          <canvas id="chartSlots"></canvas>
+        </div>
+      </div>
+
+      <!-- Weekly Density -->
+      <div class="dashboard-card">
+        <h3><i data-lucide="bar-chart-2" style="color: var(--purple); width: 20px;"></i> Haftalık Rezervasyon Dağılımı</h3>
+        <div class="chart-container">
+          <canvas id="chartWeekly"></canvas>
+        </div>
+      </div>
+
+      <!-- Monthly density -->
+      <div class="dashboard-card">
+        <h3><i data-lucide="calendar" style="color: #f59e0b; width: 20px;"></i> Aylık Rezervasyon Dağılımı</h3>
+        <div class="chart-container">
+          <canvas id="chartMonthly"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs / Detail Table -->
+    <div class="logs-card">
+      <div class="table-header">
+        <h3 style="font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="list" style="color: var(--green); width: 20px;"></i> Rezervasyon Kayıt Defteri
+        </h3>
+        <input type="text" id="searchInput" class="search-input" placeholder="İsim ile ara...">
+      </div>
+
+      <div class="table-wrapper">
+        <table id="logsTable">
+          <thead>
+            <tr>
+              <th>Tarih</th>
+              <th>Rezervasyon Sahibi</th>
+              <th>Slot Tipi</th>
+              <th>GPS Doğrulaması</th>
+              <th>Kayıt Tarihi</th>
+              <th>Özel Not</th>
+            </tr>
+          </thead>
+          <tbody id="logsTableBody">
+            <!-- Dynamic rows will be loaded here -->
+          </tbody>
+        </table>
+      </div>
+
+      <div id="tableEmptyState" class="empty-state" style="display: none;">
+        <i data-lucide="alert-circle"></i>
+        <p>Aradığınız kritere uygun rezervasyon kaydı bulunamadı.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // Constant Labels
+    const DAYS_TR = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+    const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+    // State
+    let rawReservations = {};
+    let parsedReservations = []; // Array of { date, name, slot, isGps, createdAt, note }
+    let visitorChartInstance = null;
+    let slotChartInstance = null;
+    let weeklyChartInstance = null;
+    let monthlyChartInstance = null;
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/reservations');
+        if (!res.ok) throw new Error('Veri çekilemedi.');
+        rawReservations = await res.json();
+        
+        parseReservations();
+        renderMetrics();
+        renderCharts();
+        renderLogsTable();
+      } catch (err) {
+        console.error('İstatistikler yüklenirken hata:', err);
+        // Show empty states
+        document.getElementById('dashboardContent').style.display = 'none';
+        document.getElementById('logsTable').style.display = 'none';
+        document.getElementById('tableEmptyState').style.display = 'flex';
+      }
+    }
+
+    function parseReservations() {
+      parsedReservations = [];
+      for (const [dateStr, value] of Object.entries(rawReservations)) {
+        if (!value) continue;
+        
+        // Check for split slot format
+        if (value.day || value.night) {
+          if (value.day) {
+            parsedReservations.push({
+              date: dateStr,
+              name: value.day.name,
+              slot: 'day',
+              isGps: !!value.day.isGps,
+              createdAt: value.day.createdAt || '',
+              note: value.day.note || ''
+            });
+          }
+          if (value.night) {
+            parsedReservations.push({
+              date: dateStr,
+              name: value.night.name,
+              slot: 'night',
+              isGps: !!value.night.isGps,
+              createdAt: value.night.createdAt || '',
+              note: value.night.note || ''
+            });
+          }
+        } else {
+          // Single full slot format
+          parsedReservations.push({
+            date: dateStr,
+            name: value.name,
+            slot: value.slot || 'full',
+            isGps: !!value.isGps,
+            createdAt: value.createdAt || '',
+            note: value.note || ''
+          });
+        }
+      }
+
+      // Sort chronological (newest first for logs, but we keep sorted array)
+      parsedReservations.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
+    function renderMetrics() {
+      const total = parsedReservations.length;
+      document.getElementById('valTotal').textContent = total;
+
+      if (total === 0) {
+        return;
+      }
+
+      // Calculate visitor counts
+      const visitors = {};
+      const weekly = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0};
+      const slots = { full: 0, day: 0, night: 0 };
+
+      parsedReservations.forEach(r => {
+        // Visitor
+        visitors[r.name] = (visitors[r.name] || 0) + 1;
+
+        // Weekly
+        const dObj = new Date(r.date);
+        weekly[dObj.getDay()]++;
+
+        // Slots
+        slots[r.slot]++;
+      });
+
+      // Top Visitor
+      let topVisitorName = '-';
+      let topVisitorCount = 0;
+      for (const [name, count] of Object.entries(visitors)) {
+        if (count > topVisitorCount) {
+          topVisitorCount = count;
+          topVisitorName = name;
+        }
+      }
+      document.getElementById('valPopular').textContent = topVisitorName;
+      document.getElementById('valPopularSub').textContent = `${topVisitorCount} Gün rezervasyon ile`;
+
+      // Top Day of the week
+      let topDayIdx = 0;
+      let topDayCount = -1;
+      for (const [dayIdx, count] of Object.entries(weekly)) {
+        if (count > topDayCount) {
+          topDayCount = count;
+          topDayIdx = parseInt(dayIdx);
+        }
+      }
+      document.getElementById('valDay').textContent = DAYS_TR[topDayIdx];
+      document.getElementById('valDaySub').textContent = `${topDayCount} Defa rezerve edildi`;
+
+      // Top Slot Type
+      let topSlot = 'full';
+      let topSlotCount = -1;
+      for (const [slotType, count] of Object.entries(slots)) {
+        if (count > topSlotCount) {
+          topSlotCount = count;
+          topSlot = slotType;
+        }
+      }
+      const slotLabels = { full: 'Tam Gün', day: 'Gündüz', night: 'Akşam' };
+      document.getElementById('valSlot').textContent = slotLabels[topSlot] || 'Tam Gün';
+    }
+
+    function renderCharts() {
+      if (parsedReservations.length === 0) {
+        document.getElementById('dashboardContent').style.display = 'none';
+        return;
+      }
+
+      // 1. Visitors Data
+      const visitors = {};
+      parsedReservations.forEach(r => {
+        visitors[r.name] = (visitors[r.name] || 0) + 1;
+      });
+      const sortedVisitors = Object.entries(visitors)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 7); // Show top 7
+
+      const visitorLabels = sortedVisitors.map(v => v[0]);
+      const visitorValues = sortedVisitors.map(v => v[1]);
+
+      // 2. Slots Data
+      const slotCounts = { full: 0, day: 0, night: 0 };
+      parsedReservations.forEach(r => {
+        slotCounts[r.slot]++;
+      });
+
+      // 3. Weekly Data
+      const weeklyCounts = [0, 0, 0, 0, 0, 0, 0]; // Sun to Sat
+      parsedReservations.forEach(r => {
+        const d = new Date(r.date).getDay();
+        weeklyCounts[d]++;
+      });
+      // Re-order to start from Pazartesi
+      const orderedWeeklyLabels = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+      const orderedWeeklyCounts = [
+        weeklyCounts[1], // Mon
+        weeklyCounts[2], // Tue
+        weeklyCounts[3], // Wed
+        weeklyCounts[4], // Thu
+        weeklyCounts[5], // Fri
+        weeklyCounts[6], // Sat
+        weeklyCounts[0]  // Sun
+      ];
+
+      // 4. Monthly Data
+      const monthlyCounts = {};
+      parsedReservations.forEach(r => {
+        const dt = new Date(r.date);
+        const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+        monthlyCounts[key] = (monthlyCounts[key] || 0) + 1;
+      });
+      // Sort months chronological
+      const sortedMonths = Object.keys(monthlyCounts).sort();
+      const monthlyLabels = sortedMonths.map(k => {
+        const parts = k.split('-');
+        return `${MONTHS_TR[parseInt(parts[1]) - 1]} ${parts[0]}`;
+      });
+      const monthlyValues = sortedMonths.map(k => monthlyCounts[k]);
+
+      // --- Chart.js Global styling overrides ---
+      Chart.defaults.color = 'rgba(240, 240, 245, 0.6)';
+      Chart.defaults.font.family = 'Outfit, sans-serif';
+
+      // 1. Visitors Chart
+      const ctxVis = document.getElementById('chartVisitors').getContext('2d');
+      visitorChartInstance = new Chart(ctxVis, {
+        type: 'bar',
+        data: {
+          labels: visitorLabels,
+          datasets: [{
+            label: 'Rezervasyon Günü',
+            data: visitorValues,
+            backgroundColor: 'rgba(52, 211, 153, 0.6)',
+            borderColor: '#34d399',
+            borderWidth: 1.5,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { stepSize: 1 } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+      // 2. Slots Chart
+      const ctxSlot = document.getElementById('chartSlots').getContext('2d');
+      slotChartInstance = new Chart(ctxSlot, {
+        type: 'doughnut',
+        data: {
+          labels: ['Tam Gün', 'Gündüz', 'Akşam'],
+          data: [slotCounts.full, slotCounts.day, slotCounts.night],
+          datasets: [{
+            data: [slotCounts.full, slotCounts.day, slotCounts.night],
+            backgroundColor: [
+              'rgba(52, 211, 153, 0.65)',
+              'rgba(167, 139, 250, 0.65)',
+              'rgba(96, 165, 250, 0.65)'
+            ],
+            borderColor: [
+              '#34d399',
+              '#a78bfa',
+              '#60a5fa'
+            ],
+            borderWidth: 1.5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } }
+          }
+        }
+      });
+
+      // 3. Weekly Chart
+      const ctxWeekly = document.getElementById('chartWeekly').getContext('2d');
+      weeklyChartInstance = new Chart(ctxWeekly, {
+        type: 'bar',
+        data: {
+          labels: orderedWeeklyLabels,
+          datasets: [{
+            label: 'Yoğunluk',
+            data: orderedWeeklyCounts,
+            backgroundColor: 'rgba(167, 139, 250, 0.6)',
+            borderColor: '#a78bfa',
+            borderWidth: 1.5,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { stepSize: 1 } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+      // 4. Monthly Chart
+      const ctxMonthly = document.getElementById('chartMonthly').getContext('2d');
+      monthlyChartInstance = new Chart(ctxMonthly, {
+        type: 'line',
+        data: {
+          labels: monthlyLabels,
+          datasets: [{
+            label: 'Aylık Dağılım',
+            data: monthlyValues,
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            fill: true,
+            tension: 0.3,
+            borderWidth: 2,
+            pointBackgroundColor: '#f59e0b'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { stepSize: 1 } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    function renderLogsTable(filterText = '') {
+      const tbody = document.getElementById('logsTableBody');
+      tbody.innerHTML = '';
+
+      const query = filterText.toLowerCase().trim();
+      const filtered = parsedReservations.filter(r => r.name.toLowerCase().includes(query));
+
+      if (filtered.length === 0) {
+        document.getElementById('logsTable').style.display = 'none';
+        document.getElementById('tableEmptyState').style.display = 'flex';
+        return;
+      }
+
+      document.getElementById('logsTable').style.display = 'table';
+      document.getElementById('tableEmptyState').style.display = 'none';
+
+      const slotMap = { full: 'Tam Gün', day: 'Gündüz', night: 'Akşam' };
+      const slotClassMap = { full: 's-full', day: 's-day', night: 's-night' };
+
+      filtered.forEach(r => {
+        const tr = document.createElement('tr');
+        
+        // Date format (D Month Year)
+        const dObj = new Date(r.date);
+        const dateFormatted = `${dObj.getDate()} ${MONTHS_TR[dObj.getMonth()]} ${dObj.getFullYear()}`;
+
+        // Created time formatting
+        let createdFormatted = '-';
+        if (r.createdAt) {
+          try {
+            const cObj = new Date(r.createdAt);
+            createdFormatted = `${cObj.getDate()} ${MONTHS_TR[cObj.getMonth()]} ${String(cObj.getHours()).padStart(2, '0')}:${String(cObj.getMinutes()).padStart(2, '0')}`;
+          } catch {}
+        }
+
+        const gpsHtml = r.isGps ? `<span class="gps-tag">📍 Doğrulandı</span>` : `<span style="opacity:0.4;">Normal</span>`;
+
+        tr.innerHTML = `
+          <td style="font-weight: 600;">${dateFormatted}</td>
+          <td style="font-weight: 500; color: #fff;">${escapeHtml(r.name)}</td>
+          <td><span class="status-badge ${slotClassMap[r.slot]}">${slotMap[r.slot]}</span></td>
+          <td>${gpsHtml}</td>
+          <td style="color: var(--text-dim);">${createdFormatted}</td>
+          <td style="color: var(--text-muted); font-size: 0.82rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(r.note)}">${escapeHtml(r.note) || '-'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Search event
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      renderLogsTable(e.target.value);
+    });
+
+    // Boot
+    loadStats();
+  </script>
+</body>
+</html>

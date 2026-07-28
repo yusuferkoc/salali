@@ -56,11 +56,14 @@
 
     <!-- Header -->
     <header class="header">
-      <h1 class="header-brand">Salalı</h1>
-      <div class="user-pill" id="userPill">
-        <span class="user-pill-dot"></span>
-        <span id="userName"></span>
-        <button class="user-pill-edit" id="btnChangeName" title="İsim değiştir">✏️</button>
+      <h1 class="header-brand" onclick="location.href='/'" style="cursor:pointer;">Salalı</h1>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <a href="/stats" class="stats-link" title="İstatistikler" style="background:var(--glass);border:1px solid var(--glass-border);color:var(--text);border-radius:10px;padding:6px 12px;font-size:0.8rem;text-decoration:none;display:flex;align-items:center;gap:6px;transition:all 0.3s var(--ease);"><i data-lucide="bar-chart-2" style="width:14px;height:14px;"></i> İstatistikler</a>
+        <div class="user-pill" id="userPill">
+          <span class="user-pill-dot"></span>
+          <span id="userName"></span>
+          <button class="user-pill-edit" id="btnChangeName" title="İsim değiştir">✏️</button>
+        </div>
       </div>
     </header>
 
