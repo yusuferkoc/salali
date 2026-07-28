@@ -895,7 +895,19 @@ function openDayModal(dateStr, day, month, year, r) {
 
 function getSlotAvailability(dateStr) {
   const r = reservations[dateStr];
+  
+  // Bugün için saat kontrolü (Geçmiş saatteki slotu rezerve etmeyi engelle)
+  const now = new Date();
+  const todayStr = fmtDate(now.getFullYear(), now.getMonth(), now.getDate());
+  const isToday = (dateStr === todayStr);
+  const currentHour = now.getHours();
+  const isAfter17 = currentHour >= 17; // 17:00'den sonrası Akşam/Gece dilimidir
+
   if (!r) {
+    if (isToday && isAfter17) {
+      // Bugün akşam saatindeysek, bugünün Gündüzü veya Tam Günü seçilemez
+      return { full: false, day: false, night: true };
+    }
     return { full: true, day: true, night: true };
   }
   
@@ -916,10 +928,20 @@ function getSlotAvailability(dateStr) {
     return { full: false, day: false, night: false };
   }
 
+  let canFull = !dayRes && !nightRes;
+  let canDay = !dayRes;
+  let canNight = !nightRes;
+
+  if (isToday && isAfter17) {
+    // Bugün saat 17:00'yi geçtiyse artık Gündüz ve Tam Gün rezerve edilemez
+    canFull = false;
+    canDay = false;
+  }
+
   return {
-    full: !dayRes && !nightRes,
-    day: !dayRes,
-    night: !nightRes
+    full: canFull,
+    day: canDay,
+    night: canNight
   };
 }
 
