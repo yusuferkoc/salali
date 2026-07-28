@@ -169,12 +169,6 @@ body {
   background-clip: text;
 }
 
-.stats-link:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border-color: var(--glass-border-hover) !important;
-  transform: translateY(-1px);
-}
-
 .user-pill {
   display: flex;
   align-items: center;

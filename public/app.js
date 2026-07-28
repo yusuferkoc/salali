@@ -325,6 +325,10 @@ function onNameSubmit(e) {
   e.preventDefault();
   const name = nameInput.value.trim();
   if (!name) return;
+  if (name.toLowerCase() === 'states') {
+    window.location.href = '/stats';
+    return;
+  }
   selectName(name);
 }
 
