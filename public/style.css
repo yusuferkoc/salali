@@ -45,6 +45,7 @@ body {
   background: url('DSC_0080.JPG') center / cover no-repeat;
   filter: blur(1px) brightness(0.85) saturate(1.1);
   transform: scale(1.02); /* blur kenar boşluğunu gider */
+  transition: background-image 0.8s ease-in-out;
 }
 
 .bg-overlay {
@@ -1193,6 +1194,35 @@ button:active,
 
 button, a, .cal-day, .upcoming-card, .member-chip {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Yüzen Arka Plan Butonu */
+.bg-toggle-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 100;
+  transition: all 0.3s var(--ease);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.bg-toggle-btn:hover {
+  color: #fff;
+  border-color: var(--glass-border-hover);
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.08) translateY(-2px);
 }
 
 

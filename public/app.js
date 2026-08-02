@@ -234,6 +234,50 @@ const modalTitle = $('modalTitle');
 const modalBody = $('modalBody');
 const quickMembers = $('quickMembers');
 const memberChips = $('memberChips');
+const btnToggleBg = $('btnToggleBg');
+
+// ========== Background Slideshow Logic ==========
+const BG_IMAGES = [
+  'DSC_0080.JPG',
+  'bg.jpg',
+  '2a61869c-dec9-4031-b698-5d09556c9e4c.jpg',
+  'f2890678-3d8d-49cb-98b7-e7d789c849b1.jpg',
+  'fe09aaa9-ef13-4a82-9ddc-d554ed52d8ef.jpg'
+];
+
+function getAutoBgIndex(hour) {
+  if (hour >= 5 && hour < 11) return 0; // Morning (DSC_0080.JPG)
+  if (hour >= 11 && hour < 16) return 1; // Midday (bg.jpg)
+  if (hour >= 16 && hour < 19) return 2; // Sunset (2a61869c-dec9-4031-b698-5d09556c9e4c.jpg)
+  if (hour >= 19 && hour < 22) return 3; // Twilight (f2890678-3d8d-49cb-98b7-e7d789c849b1.jpg)
+  return 4; // Night (fe09aaa9-ef13-4a82-9ddc-d554ed52d8ef.jpg)
+}
+
+function applyBackground() {
+  let index = localStorage.getItem('salali_bg_idx');
+  if (index === null) {
+    index = getAutoBgIndex(new Date().getHours());
+  } else {
+    index = parseInt(index, 10);
+  }
+  const bgPhoto = document.querySelector('.bg-photo');
+  if (bgPhoto) {
+    bgPhoto.style.backgroundImage = `url('${BG_IMAGES[index]}')`;
+  }
+}
+
+function toggleBackground() {
+  let currentIndex = localStorage.getItem('salali_bg_idx');
+  if (currentIndex === null) {
+    currentIndex = getAutoBgIndex(new Date().getHours());
+  } else {
+    currentIndex = parseInt(currentIndex, 10);
+  }
+  const nextIndex = (currentIndex + 1) % BG_IMAGES.length;
+  localStorage.setItem('salali_bg_idx', nextIndex);
+  applyBackground();
+  showToast('Arka plan görseli değiştirildi.', 'info');
+}
 
 // Toast Notification
 function showToast(msg, type = 'info') {
@@ -266,6 +310,12 @@ function init() {
     showNameOverlay();
   }
 
+  // Arka planı uygula
+  applyBackground();
+  if (btnToggleBg) {
+    btnToggleBg.addEventListener('click', toggleBackground);
+  }
+
   nameForm.addEventListener('submit', onNameSubmit);
   btnChangeName.addEventListener('click', onChangeName);
   btnPrev.addEventListener('click', () => navWeek(-1));
@@ -292,6 +342,7 @@ async function showNameOverlay() {
   document.documentElement.classList.add('name-changing');
   nameOverlay.style.display = 'flex';
   appContent.style.display = 'none';
+  if (btnToggleBg) btnToggleBg.style.display = 'none';
 
   try {
     const res = await fetch('/api/members');
@@ -344,6 +395,7 @@ function showApp() {
   document.documentElement.classList.remove('name-changing');
   nameOverlay.style.display = 'none';
   appContent.style.display = 'block';
+  if (btnToggleBg) btnToggleBg.style.display = 'flex';
   userNameEl.textContent = currentUser;
   loadReservations();
 }
