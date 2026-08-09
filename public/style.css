@@ -54,10 +54,26 @@ body {
   z-index: -1;
   background: linear-gradient(
     180deg,
-    rgba(10, 10, 15, 0.15) 0%,
-    rgba(10, 10, 15, 0.35) 50%,
-    rgba(10, 10, 15, 0.55) 100%
+    rgba(10, 10, 15, 0.12) 0%,
+    rgba(10, 10, 15, 0.32) 50%,
+    rgba(10, 10, 15, 0.52) 100%
   );
+}
+
+/* Mobil için Arka Plan İyileştirmeleri */
+@media (max-width: 768px) {
+  .bg-photo {
+    filter: brightness(0.9) saturate(1.15); /* Bulanıklığı tamamen kaldırıp görseli canlandır */
+    transform: scale(1.0);
+  }
+  .bg-overlay {
+    background: linear-gradient(
+      180deg,
+      rgba(10, 10, 15, 0.05) 0%,
+      rgba(10, 10, 15, 0.3) 50%,
+      rgba(10, 10, 15, 0.6) 100%
+    );
+  }
 }
 
 /* ===== Name Overlay ===== */
