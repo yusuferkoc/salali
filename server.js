@@ -562,11 +562,14 @@ app.post('/api/notes', async (req, res) => {
         },
         body: JSON.stringify(newNote)
       });
-      if (!sRes.ok) throw new Error(await sRes.text());
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        throw new Error(`Supabase API hatası: ${sRes.status} - ${errText}`);
+      }
       inMemoryNotes = await fetchNotesFromSupabase();
     } catch (e) {
       console.error('Supabase POST notes error:', e.message);
-      return res.status(500).json({ error: 'Veritabanı not ekleme hatası oluştu.' });
+      return res.status(500).json({ error: `Veritabanı not ekleme hatası oluştu: ${e.message}` });
     }
   } else {
     inMemoryNotes = readLocalNotes();
@@ -594,11 +597,14 @@ app.patch('/api/notes/:id', async (req, res) => {
         },
         body: JSON.stringify({ completed: !!completed })
       });
-      if (!sRes.ok) throw new Error(await sRes.text());
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        throw new Error(`Supabase API hatası: ${sRes.status} - ${errText}`);
+      }
       inMemoryNotes = await fetchNotesFromSupabase();
     } catch (e) {
       console.error('Supabase PATCH notes error:', e.message);
-      return res.status(500).json({ error: 'Veritabanı not güncelleme hatası oluştu.' });
+      return res.status(500).json({ error: `Veritabanı not güncelleme hatası oluştu: ${e.message}` });
     }
   } else {
     inMemoryNotes = readLocalNotes();
@@ -626,11 +632,14 @@ app.delete('/api/notes/:id', async (req, res) => {
           'Authorization': `Bearer ${SUPABASE_KEY}`
         }
       });
-      if (!sRes.ok) throw new Error(await sRes.text());
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        throw new Error(`Supabase API hatası: ${sRes.status} - ${errText}`);
+      }
       inMemoryNotes = await fetchNotesFromSupabase();
     } catch (e) {
       console.error('Supabase DELETE notes error:', e.message);
-      return res.status(500).json({ error: 'Veritabanı not silme hatası oluştu.' });
+      return res.status(500).json({ error: `Veritabanı not silme hatası oluştu: ${e.message}` });
     }
   } else {
     inMemoryNotes = readLocalNotes();
