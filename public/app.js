@@ -324,6 +324,21 @@ function init() {
   modalBg.addEventListener('click', e => { if (e.target === modalBg) closeModal(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
+  // Bucket list'i yükle
+  loadBucketList();
+
+  const bucketForm = $('bucketForm');
+  if (bucketForm) {
+    bucketForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = $('bucketInput');
+      if (input) {
+        addBucketItem(input.value);
+        input.value = '';
+      }
+    });
+  }
+
   // Hava durumunu yükle
   loadWeather();
 
@@ -1170,6 +1185,84 @@ async function verifyCurrentReservationLocation(dateStr, slot, existingNote) {
   } catch (err) {
     showToast(err, 'error');
   }
+}
+
+// ========== Bucket List Logic ==========
+let bucketItems = [];
+
+function loadBucketList() {
+  try {
+    const raw = localStorage.getItem('salali_bucket_list');
+    bucketItems = raw ? JSON.parse(raw) : [
+      { id: 1, text: 'Şömine başında Türk kahvesi içmek ☕', completed: false },
+      { id: 2, text: 'Kar yağarken dışarıda mangal yapmak 🥩❄️', completed: false },
+      { id: 3, text: 'Sabah erken yürüyüşte mantar toplamak 🍄', completed: false },
+      { id: 4, text: 'Hamakta yıldızları seyretmek 🌌', completed: false }
+    ];
+  } catch {
+    bucketItems = [];
+  }
+  renderBucketList();
+}
+
+function saveBucketList() {
+  try {
+    localStorage.setItem('salali_bucket_list', JSON.stringify(bucketItems));
+  } catch {}
+}
+
+function renderBucketList() {
+  const container = $('bucketList');
+  if (!container) return;
+  container.innerHTML = '';
+
+  bucketItems.forEach(item => {
+    const el = document.createElement('div');
+    el.className = `bucket-item ${item.completed ? 'completed' : ''}`;
+    
+    el.innerHTML = `
+      <div class="bucket-content" onclick="toggleBucketItem(${item.id})">
+        <span class="bucket-checkbox">
+          <i data-lucide="check" style="width:12px;height:12px;"></i>
+        </span>
+        <span class="bucket-text">${esc(item.text)}</span>
+      </div>
+      <button class="btn-bucket-delete" onclick="deleteBucketItem(${item.id})" title="Sil">
+        <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+      </button>
+    `;
+    container.appendChild(el);
+  });
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function addBucketItem(text) {
+  const clean = text.trim();
+  if (!clean) return;
+  const newItem = {
+    id: Date.now(),
+    text: clean,
+    completed: false
+  };
+  bucketItems.push(newItem);
+  saveBucketList();
+  renderBucketList();
+}
+
+function toggleBucketItem(id) {
+  const item = bucketItems.find(x => x.id === id);
+  if (item) {
+    item.completed = !item.completed;
+    saveBucketList();
+    renderBucketList();
+  }
+}
+
+function deleteBucketItem(id) {
+  bucketItems = bucketItems.filter(x => x.id !== id);
+  saveBucketList();
+  renderBucketList();
 }
 
 // ========== Start ==========

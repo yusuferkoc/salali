@@ -1241,6 +1241,98 @@ button, a, .cal-day, .upcoming-card, .member-chip {
   transform: scale(1.08) translateY(-2px);
 }
 
+/* ===== Bucket List Stilleri ===== */
+.bucket-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.bucket-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  transition: all 0.25s var(--ease);
+  margin-bottom: 2px;
+}
+
+.bucket-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--glass-border-hover);
+}
+
+.bucket-item.completed {
+  opacity: 0.55;
+  background: rgba(52, 211, 153, 0.03);
+  border-color: rgba(52, 211, 153, 0.1);
+}
+
+.bucket-item.completed .bucket-text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.bucket-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  flex: 1;
+}
+
+.bucket-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid var(--glass-border-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  color: transparent;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.bucket-item.completed .bucket-checkbox {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+
+.bucket-text {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text);
+  transition: all 0.2s;
+}
+
+.btn-bucket-delete {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  margin-left: 10px;
+}
+
+.btn-bucket-delete:hover {
+  color: var(--red);
+  background: rgba(248, 113, 113, 0.1);
+}
+
 
 
 
