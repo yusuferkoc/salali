@@ -1193,12 +1193,7 @@ let bucketItems = [];
 function loadBucketList() {
   try {
     const raw = localStorage.getItem('salali_bucket_list');
-    bucketItems = raw ? JSON.parse(raw) : [
-      { id: 1, text: 'Şömine başında Türk kahvesi içmek ☕', completed: false },
-      { id: 2, text: 'Kar yağarken dışarıda mangal yapmak 🥩❄️', completed: false },
-      { id: 3, text: 'Sabah erken yürüyüşte mantar toplamak 🍄', completed: false },
-      { id: 4, text: 'Hamakta yıldızları seyretmek 🌌', completed: false }
-    ];
+    bucketItems = raw ? JSON.parse(raw) : [];
   } catch {
     bucketItems = [];
   }
