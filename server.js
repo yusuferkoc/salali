@@ -490,6 +490,157 @@ app.delete('/api/reservations/:date', async (req, res) => {
   res.json({ success: true });
 });
 
+// ========== Notlar (Notes) API ==========
+const NOTES_FILE = path.join(dataDir, 'notes.json');
+let inMemoryNotes = [];
+
+function readLocalNotes() {
+  try {
+    if (fs.existsSync(NOTES_FILE)) {
+      const raw = fs.readFileSync(NOTES_FILE, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    console.error('Yerel notlar okunamadı:', e.message);
+  }
+  return [];
+}
+
+function writeLocalNotes(data) {
+  try {
+    fs.writeFileSync(NOTES_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Yerel notlar yazılamadı:', e.message);
+  }
+}
+
+async function fetchNotesFromSupabase() {
+  const url = `${SUPABASE_URL}/rest/v1/notes?order=id.asc`;
+  const res = await fetch(url, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`
+    }
+  });
+  if (!res.ok) throw new Error(`Supabase GET notes error: ${res.status}`);
+  return await res.json();
+}
+
+// GET all notes
+app.get('/api/notes', async (req, res) => {
+  if (isSupabaseEnabled) {
+    try {
+      inMemoryNotes = await fetchNotesFromSupabase();
+      return res.json(inMemoryNotes);
+    } catch (e) {
+      console.error('Supabase not yükleme hatası, yerel önbellek kullanılıyor:', e.message);
+    }
+  }
+  inMemoryNotes = readLocalNotes();
+  res.json(inMemoryNotes);
+});
+
+// POST new note
+app.post('/api/notes', async (req, res) => {
+  const { id, text, completed } = req.body;
+  if (!id || !text) {
+    return res.status(400).json({ error: 'id ve text alanları gerekli.' });
+  }
+
+  const newNote = { id, text, completed: !!completed };
+
+  if (isSupabaseEnabled) {
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/notes`;
+      const sRes = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(newNote)
+      });
+      if (!sRes.ok) throw new Error(await sRes.text());
+      inMemoryNotes = await fetchNotesFromSupabase();
+    } catch (e) {
+      console.error('Supabase POST notes error:', e.message);
+      return res.status(500).json({ error: 'Veritabanı not ekleme hatası oluştu.' });
+    }
+  } else {
+    inMemoryNotes = readLocalNotes();
+    inMemoryNotes.push(newNote);
+    writeLocalNotes(inMemoryNotes);
+  }
+
+  res.json({ success: true, notes: inMemoryNotes });
+});
+
+// PATCH update note completion state
+app.patch('/api/notes/:id', async (req, res) => {
+  const { id } = req.params;
+  const { completed } = req.body;
+
+  if (isSupabaseEnabled) {
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/notes?id=eq.${id}`;
+      const sRes = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ completed: !!completed })
+      });
+      if (!sRes.ok) throw new Error(await sRes.text());
+      inMemoryNotes = await fetchNotesFromSupabase();
+    } catch (e) {
+      console.error('Supabase PATCH notes error:', e.message);
+      return res.status(500).json({ error: 'Veritabanı not güncelleme hatası oluştu.' });
+    }
+  } else {
+    inMemoryNotes = readLocalNotes();
+    const note = inMemoryNotes.find(n => String(n.id) === String(id));
+    if (note) {
+      note.completed = !!completed;
+      writeLocalNotes(inMemoryNotes);
+    }
+  }
+
+  res.json({ success: true, notes: inMemoryNotes });
+});
+
+// DELETE a note
+app.delete('/api/notes/:id', async (req, res) => {
+  const { id } = req.params;
+
+  if (isSupabaseEnabled) {
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/notes?id=eq.${id}`;
+      const sRes = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (!sRes.ok) throw new Error(await sRes.text());
+      inMemoryNotes = await fetchNotesFromSupabase();
+    } catch (e) {
+      console.error('Supabase DELETE notes error:', e.message);
+      return res.status(500).json({ error: 'Veritabanı not silme hatası oluştu.' });
+    }
+  } else {
+    inMemoryNotes = readLocalNotes();
+    inMemoryNotes = inMemoryNotes.filter(n => String(n.id) !== String(id));
+    writeLocalNotes(inMemoryNotes);
+  }
+
+  res.json({ success: true, notes: inMemoryNotes });
+});
+
 // Health check / Keep-alive endpoint
 app.get('/api/ping', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

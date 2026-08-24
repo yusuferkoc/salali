@@ -347,7 +347,10 @@ function init() {
 
   // 15 saniyede bir otomatik veri yenileme
   setInterval(() => {
-    if (currentUser) loadReservations(true);
+    if (currentUser) {
+      loadReservations(true);
+      loadBucketList();
+    }
   }, 15000);
 }
 
@@ -1187,23 +1190,22 @@ async function verifyCurrentReservationLocation(dateStr, slot, existingNote) {
   }
 }
 
-// ========== Bucket List Logic ==========
+// ========== Bucket List Logic (Server Synced) ==========
 let bucketItems = [];
 
-function loadBucketList() {
+async function loadBucketList() {
   try {
-    const raw = localStorage.getItem('salali_bucket_list');
-    bucketItems = raw ? JSON.parse(raw) : [];
-  } catch {
+    const res = await fetch('/api/notes');
+    if (res.ok) {
+      bucketItems = await res.json();
+    } else {
+      bucketItems = [];
+    }
+  } catch (e) {
+    console.error('Notlar yüklenemedi:', e);
     bucketItems = [];
   }
   renderBucketList();
-}
-
-function saveBucketList() {
-  try {
-    localStorage.setItem('salali_bucket_list', JSON.stringify(bucketItems));
-  } catch {}
 }
 
 function renderBucketList() {
@@ -1232,7 +1234,7 @@ function renderBucketList() {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-function addBucketItem(text) {
+async function addBucketItem(text) {
   const clean = text.trim();
   if (!clean) return;
   const newItem = {
@@ -1240,24 +1242,63 @@ function addBucketItem(text) {
     text: clean,
     completed: false
   };
-  bucketItems.push(newItem);
-  saveBucketList();
-  renderBucketList();
-}
 
-function toggleBucketItem(id) {
-  const item = bucketItems.find(x => x.id === id);
-  if (item) {
-    item.completed = !item.completed;
-    saveBucketList();
-    renderBucketList();
+  try {
+    const res = await fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newItem)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      bucketItems = data.notes;
+      renderBucketList();
+    } else {
+      showToast('Not eklenirken hata oluştu.', 'error');
+    }
+  } catch (e) {
+    showToast('Sunucu bağlantı hatası.', 'error');
   }
 }
 
-function deleteBucketItem(id) {
-  bucketItems = bucketItems.filter(x => x.id !== id);
-  saveBucketList();
-  renderBucketList();
+async function toggleBucketItem(id) {
+  const item = bucketItems.find(x => x.id === id);
+  if (!item) return;
+  const nextCompleted = !item.completed;
+
+  try {
+    const res = await fetch(`/api/notes/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed: nextCompleted })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      bucketItems = data.notes;
+      renderBucketList();
+    } else {
+      showToast('Not güncellenirken hata oluştu.', 'error');
+    }
+  } catch (e) {
+    showToast('Sunucu bağlantı hatası.', 'error');
+  }
+}
+
+async function deleteBucketItem(id) {
+  try {
+    const res = await fetch(`/api/notes/${id}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      bucketItems = data.notes;
+      renderBucketList();
+    } else {
+      showToast('Not silinirken hata oluştu.', 'error');
+    }
+  } catch (e) {
+    showToast('Sunucu bağlantı hatası.', 'error');
+  }
 }
 
 // ========== Start ==========
